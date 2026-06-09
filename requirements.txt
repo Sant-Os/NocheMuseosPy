@@ -1,0 +1,7 @@
+PyQt5
+PyQtWebEngine
+folium
+networkx
+requests
+geopy
+polyline
