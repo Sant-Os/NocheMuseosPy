@@ -1,529 +1,350 @@
-# MANUAL EXHAUSTIVO DE DESARROLLO EN PYTHON Y GUÍA DE USUARIO
-## Proyecto: Optimización de Rutas para la Noche de Museos en Cochabamba
-**Materia:** Inteligencia Artificial
+# MANUAL TÉCNICO Y DE USUARIO: OPTIMIZACIÓN MULTI-AGENTE PARA RUTAS DE MUSEOS
+## Proyecto: Noche de Museos en Cochabamba
+**Materia:** Inteligencia Artificial  
 **Desarrollado por:** Estudiante 1, Estudiante 2, Estudiante 3, Estudiante 4.
 
 ---
 
-Este documento técnico funciona como la piedra angular del desarrollo e implementación del software que hemos construido. Aquí detallamos línea por línea la abstracción técnica detrás de la Inteligencia Artificial construida por nosotros en Python, junto a las instrucciones estrictas para su configuración e instalación.
+## CAPÍTULO I: MARCO METODOLÓGICO Y TECNOLÓGICO
 
----
+### 1.1. Introducción y Selección del Ecosistema
+Este documento técnico funciona como la piedra angular del desarrollo e implementación del software que nuestro equipo ha construido para la materia de Inteligencia Artificial. Detallamos la abstracción técnica detrás del cerebro de optimización construido en Python. Elegimos Python debido a su versatilidad para manejar hilos concurrentes, diccionarios en memoria y su fácil integración con motores de renderizado web.
 
-## SECCIÓN I: INSTALACIÓN Y JUSTIFICACIÓN DEL ECOSISTEMA PYTHON
-Nuestro programa requiere la instalación de un entorno virtual (`venv` en Python) o la instalación global de las librerías requeridas. Estructuramos el stack tecnológico para evitar el uso de servidores backend externos, condensando tanto la GUI (Interfaz) como la lógica y renderizado web en un solo archivo ejecutable.
+### 1.2. Despliegue de Librerías Externas
+Nuestro programa requiere la instalación de las siguientes librerías para funcionar:
+- **`PyQt5`:** La utilizamos para desplegar la ventana principal y, lo más importante, para acceder a la clase `QThread`, la cual es vital para el paralelismo de la IA.
+- **`requests` y `polyline`:** Nos permiten comunicarnos con servidores cartográficos externos para desencriptar calles de Cochabamba.
+- **`folium`:** Construye el mapa interactivo en lenguaje web para inyectarlo al simulador.
 
-**Comando de instalación global:**
 ```bash
-pip install PyQt5 PyQtWebEngine folium geopy requests polyline
+pip install PyQt5 PyQtWebEngine folium requests polyline geopy
 ```
 
-**Explicación Fundamental de las Bibliotecas (¿Para qué se instalaron?):**
-1. **PyQt5 & PyQtWebEngine:** 
-   - *Justificación (Teoría):* Las interfaces estándar de Python (Tkinter) carecen de soporte robusto para la navegación web interna. PyQt5 incorpora un puente de C++ hacia Python extremadamente rápido. `PyQtWebEngine` incluye una versión mínima de Google Chrome que se empaqueta dentro del programa.
-   - *Comando de Terminal:* `pip install PyQt5 PyQtWebEngine`
-   - *Código de Ejecución en el Proyecto:*
-```python
-from PyQt5.QtWidgets import QApplication, QMainWindow
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-import sys
-
-# Levantando el motor de interfaz en main.py y ui_ventana.py
-aplicacion = QApplication(sys.argv)
-visor_web = QWebEngineView()
-```
-2. **Folium (Librería Leaflet en Python):**
-   - *Justificación (Teoría):* Dibujar calles a mano usando lienzos básicos es impensable para un mapa global. Python usa Folium para automatizar la inyección de una librería de código libre. Toma nuestros vectores de líneas (Latitud, Longitud) y genera un archivo en `Lenguaje de Marcado de Hipertexto` totalmente programable.
-   - *Comando de Terminal:* `pip install folium`
-   - *Código de Ejecución en el Proyecto:*
-```python
-import folium
-
-# Generando el mapa de Cochabamba en ui_ventana.py
-mapa_folium = folium.Map(location=[-17.3895, -66.1568], zoom_start=14)
-folium.CircleMarker(location=[-17.3935, -66.1568], color='red').add_to(mapa_folium)
-mapa_folium.save("mapa_museos.html")
-```
-3. **Geopy:**
-   - *Justificación (Teoría):* El humano no comprende coordenadas `(-17.3897, -66.1579)`, comprende lenguaje (Ej. "Convento Santa Teresa"). Al invocar la herramienta a través de Geopy, enviamos la dirección textual a servidores internacionales, y recibimos el punto exacto de coordenadas geográficas.
-   - *Comando de Terminal:* `pip install geopy`
-   - *Código de Ejecución en el Proyecto:*
-```python
-from geopy.geocoders import Nominatim
-
-# Código usado en ui_ventana.py para buscar el Punto de Partida
-geolocalizador = Nominatim(user_agent="NocheMuseosCba")
-ubicacion = geolocalizador.geocode("Plaza de las Banderas, Cochabamba")
-
-if ubicacion:
-    latitud_origen = ubicacion.latitude
-    longitud_origen = ubicacion.longitude
-```
-4. **Requests & Polyline:**
-   - *Justificación (Teoría):* Necesitamos decirle al auto de la simulación por dónde ir sin pasar encima de los edificios. `Requests` hace peticiones de red al servidor. `Polyline` es el decodificador matemático que traduce la cadena devuelta a una extensa lista Python de coordenadas geográficas.
-   - *Comando de Terminal:* `pip install requests polyline`
-   - *Código de Ejecución en el Proyecto:*
-```python
-import requests
-import polyline
-
-# Obteniendo ruta real en configuracion.py
-url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-
-headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
-respuesta = requests.get(url, headers=headers, timeout=5)
-datos = respuesta.json()
-
-if datos.get('code') == 'Ok':
-    ruta_obtenida = datos['routes'][0]
-    # Desencriptando a lista de Lat/Lon para la animación
-    coordenadas_calle = polyline.decode(ruta_obtenida['geometry'])
-```
-
-**Explicación de las Bibliotecas Nativas (Preinstaladas en Python):**
-El proyecto también hace uso extensivo de las librerías "Core" de Python, las cuales no requieren ser instaladas pero son fundamentales para el ecosistema:
-1. **`math`**: Utilizada para los cálculos avanzados de trigonometría esférica necesarios para medir la distancia real en la Tierra entre dos coordenadas geográficas.
-2. **`json`**: Encargada de leer y escribir nuestros cachés duales (`cache_peatonal.json` y `cache_taxi.json`), permitiendo la persistencia de datos sin conexión a internet y previniendo el bloqueo de nuestra dirección de protocolo de internet en servidores remotos.
-3. **`os` y `sys`**: Librerías de sistema operativo. Proveen la capacidad de interactuar con el entorno (rutas relativas de archivos), controlar las banderas del motor de navegación visual y salir del programa de forma segura.
-4. **`time`**: Controla el ritmo del Hilo de Animación frenando el bucle unos milisegundos para lograr el efecto visual de fluidez de movimiento (fotogramas por segundo) en los viajes de la simulación.
-5. **`itertools`**: Fundamental para el Agente Buscador. Es el motor combinatorio que genera eficientemente todas las permutaciones posibles de las rutas seleccionadas por el usuario.
-
-**El Papel Fundamental de OpenStreetMap (OSM) en el Proyecto:**
-
-1. **Justificación (Teoría):** 
-   OpenStreetMap es la inmensa base de datos geográfica comunitaria que da vida a toda nuestra simulación. Se incorpora al proyecto en dos pilares:
-   - **Visualmente:** Cuando `folium` dibuja el mapa, no genera vectores de la nada, sino que descarga las *Teselas* (imágenes cuadradas) desde los servidores de OpenStreetMap.
-   - **Físicamente:** La Interfaz de Programación de Aplicaciones de Enrutamiento utiliza los datos de OpenStreetMap en Bolivia para indicarle a la Inteligencia Artificial qué calles son de sentido único, dónde hay parques y veredas.
-   
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Al ser una base de datos pública y un servicio en la nube, OpenStreetMap no se instala localmente, sino que se accede a sus servidores vía internet durante la ejecución del programa.
-
-3. **Código de Ejecución en el Proyecto:**
-   En el archivo `configuracion.py`, realizamos una petición a los servidores OSRM basados en OpenStreetMap para rastrear el camino físico del peatón:
-```python
-import requests
-import polyline
-
-# Se invoca a routing.openstreetmap.de pidiendo la ruta peatonal (routed-foot)
-url_peaton = f"https://routing.openstreetmap.de/routed-foot/route/v1/driving/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-
-headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
-respuesta = requests.get(url_peaton, headers=headers, timeout=5)
-datos = respuesta.json()
-
-if datos.get('code') == 'Ok':
-    # Se extrae la cadena encriptada de OSM y se decodifica en puntos GPS
-    ruta_obtenida = datos['routes'][0]
-    puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
-```
+### 1.3. Librerías Nativas y Rendimiento
+Hacemos uso extensivo de las librerías Core de Python:
+- `math` y `itertools` para cálculos de Poda Factorial.
+- `json` para persistencia del Caché Dual de rutas.
+- `time` para pausar hilos y sincronizar fotogramas.
 
 ---
 
-## SECCIÓN II: ARQUITECTURA DE SOFTWARE (PROGRAMACIÓN ORIENTADA A OBJETOS Y QTHREAD)
-En interfaces gráficas, Python ejecuta su código línea por línea en el Hilo principal. Si le decíamos a Python "Explora 10 millones de combinaciones matemáticas para encontrar la ruta a los museos", la interfaz visual (los botones, el mapa) se quedaba completamente congelada. 
+## CAPÍTULO II: FUNDAMENTOS DE INTELIGENCIA ARTIFICIAL APLICADA
 
-### 2.1. El Multithreading mediante `QThread`
-Nuestra solución técnica fue crear los Agentes usando clases que heredan explícitamente de la librería paralela de Qt (`QThread`). 
-- **Agente `BuscadorRutas`:** Analiza y poda el árbol factorial. Lo programamos para ejecutarse en un núcleo distinto del procesador. A medida que avanza, emite una señal nativa `pyqtSignal(str)` que intercepta el Hilo Principal. Esto actualiza la consola en negro con verde del simulador sin colapsar la pantalla.
-- **Agente `AnimadorMovimiento`:** También lo configuramos como un `QThread`. Su función es simple pero vital: posee un bloqueante (`time.sleep(1/30)`) que representa los fotogramas (30 FPS). En cada fotograma, predice matemáticamente el salto intermedio.
+Nuestra arquitectura no fue diseñada al azar. Está fundamentada estrictamente en la taxonomía clásica de la Inteligencia Artificial (basada en Russell y Norvig), adaptada a la geografía de Cochabamba. A continuación, exponemos **el código fuente completo** que nuestro equipo desarrolló para dar vida a estos cuatro agentes.
 
-### 2.2. Rutas, Paradas de Micros y su Incorporación Visual
+### 2.1. Agente Reactivo Simple (`AgenteGuia`)
+Toma decisiones basadas únicamente en la percepción del momento actual (reglas Si-Entonces). Cuando el turista llega al museo, reacciona, cobra la entrada y pausa el tiempo.
 
-1. **Justificación (Teoría):** 
-   A diferencia del trazado general de OSRM, las líneas de micros de Cochabamba no están en servidores internacionales. Los datos se descargaron desde un repositorio abierto de movilidad urbana en formato GeoJSON (`rutas_trufis.geojson`). 
-   - *¿Las Paradas?* Cochabamba tiene un sistema de paradas flexibles. El algoritmo asume analíticamente el inicio y el fin del vector del trufi (y sus vértices más cercanos a los museos) como "paradas lógicas". 
-   - *¿El Mapa?* Para incorporarlos visualmente sin sobrecargar la pantalla, usamos la librería de mapas para inyectar vectores de color morado (rutas) y círculos naranjas (paradas).
-
-2. **Comando de Terminal (Instalación):** 
-   Ejecutar el script preparador para descargar los vectores geográficos desde GitHub:
-   ```bash
-   python setup_trufis.py
-   ```
-
-3. **Código de Ejecución en el Proyecto:**
-   En `ui_ventana.py`, el sistema lee el archivo JSON descargado y utiliza los comandos de `folium` para inyectarlos como gráficos en el mapa interactivo:
 ```python
-# Incorporación al mapa en ui_ventana.py
-import folium
+class AgenteGuia:
+    def __init__(self, ui_principal, funcion_reloj, funcion_plata, minutos_visita):
+        self.interfaz = ui_principal
+        self.restar_reloj = funcion_reloj 
+        self.restar_plata = funcion_plata
+        self.minutos_visita = minutos_visita
+        self.animacion = None
 
-with open("rutas_trufis.geojson", "r", encoding="utf-8") as f:
-    datos_trufis = json.load(f)
+    def aterrizaje(self, nombre_edificio, funcion_continuar):
+        if nombre_edificio == 'Origen':
+            mensaje = QMessageBox(self.interfaz)
+            mensaje.setWindowTitle("Fin")
+            mensaje.setText("¡Llegaste a casa!")
+            mensaje.setIcon(QMessageBox.Information)
+            mensaje.addButton("Aceptar", QMessageBox.AcceptRole)
+            mensaje.exec_()
+            self.interfaz.consola_registros.append("[Guía] Fin del tour.")
+            self.interfaz.boton_calcular.setEnabled(True)
+            funcion_continuar()
+            return
 
-for elemento in datos_trufis["features"]:
-    coord_puntos = elemento["geometry"]["coordinates"]
-    
-    # 1. Dibujando la ruta del micro (Línea Morada)
-    folium.PolyLine(locations=lista_formateada, color='purple', weight=3, opacity=0.6).add_to(mapa_folium)
-    
-    # 2. Dibujando la parada del micro (Punto Naranja) en el inicio de la línea
-    inicio_gps = [coord_puntos[0][1], coord_puntos[0][0]]
-    folium.CircleMarker(
-        location=inicio_gps, radius=4, color='orange',
-        fill=True, fill_color='orange', fillOpacity=0.9,
-        tooltip="Parada"
-    ).add_to(mapa_folium)
+        precio_boleto = ENTRADAS.get(nombre_edificio, 0)
+        mensaje = QMessageBox(self.interfaz)
+        mensaje.setWindowTitle("Museo")
+        mensaje.setText(f"Visitar {nombre_edificio}?")
+        mensaje.setIcon(QMessageBox.Question)
+        mensaje.addButton("Entrar", QMessageBox.AcceptRole)
+        mensaje.exec_()
+        
+        if precio_boleto > 0:
+            self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
+            
+        self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
+        multiplicador_aceleracion = int(self.interfaz.combo_acelerador.currentText().replace("x", ""))
+        self.animacion = ControladorTurista(self.minutos_visita, multiplicador_aceleracion)
+        self.animacion.senal_reloj.connect(self.interfaz.restar_minutos)
+        
+        def al_salir():
+            self.interfaz.consola_registros.append(f"[Guía] Saliendo de {nombre_edificio}.")
+            nombre_limpio = nombre_edificio.replace("'", "\\'")
+            self.interfaz.visor_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_limpio}', 'green');")
+            funcion_continuar()
+            
+        self.animacion.senal_salida.connect(al_salir)
+        self.animacion.start()
 ```
 
----
+### 2.2. Agente Reactivo Basado en Modelos (`AnimadorMovimiento`)
+Mantiene un estado interno sobre cómo es el mundo físico (las calles de Cochabamba). Calcula matemáticamente la interpolación entre coordenadas GPS.
 
-### 2.3. Mapeo de Ubicaciones: Los Museos
-
-1. **Justificación (Teoría):** 
-   Para que el Algoritmo (la red neuronal de búsqueda) pueda calcular distancias, necesita conocer el punto A y el punto B exactos. En lugar de levantar y mantener una pesada base de datos externa (como un servidor de bases de datos) para datos que rara vez cambian, decidimos mapear y codificar de forma fija y estática la lista de museos como un diccionario global en el programa. Cada nombre de museo actúa como la llave, y su valor es una Tupla matemática con su latitud y longitud, previamente extraída con precisión.
-
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Al ser una variable nativa del lenguaje Python alojada en el archivo de configuración del proyecto, no requiere instalaciones ni descargas.
-
-3. **Código de Ejecución en el Proyecto:**
-   Dentro del archivo `configuracion.py` se declara el diccionario, el cual luego es exportado y leído por la interfaz (`ui_ventana.py`) para generar las listas y los marcadores visuales:
 ```python
-# Extracto en configuracion.py
-MUSEOS = {
-    '[A] Convento Museo Santa Teresa': (-17.389753, -66.157962),
-    '[B] Museo Casa Martín Cárdenas': (-17.392648, -66.160518),
-    '[C] Casona de Santiváñez': (-17.394425, -66.159162),
-    # ... (20 museos más) ...
-    '[W] Museo de Historia Natural Alcide dOrbigny': (-17.373723, -66.153692)
-}
+class AnimadorMovimiento(QThread):
+    senal_coordenada = pyqtSignal(float, float, str)
+    senal_reloj = pyqtSignal(float)
+    senal_llegada = pyqtSignal(str)
 
-# Extracto en ui_ventana.py donde se construyen los checkboxes dinámicamente
-from configuracion import MUSEOS
-
-for nombre_museo in MUSEOS.keys():
-    item = QListWidgetItem(nombre_museo)
-    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-    item.setCheckState(Qt.Unchecked)
-    self.lista_interfaz_museos.addItem(item)
+    def __init__(self, lista_geometrias, kmh_auto, kmh_pie, multiplicador_velocidad):
+        super().__init__()
+        self.trazos = lista_geometrias
+        self.velocidad_metros_auto = (kmh_auto * 1000) / 3600.0
+        self.velocidad_metros_pie = (kmh_pie * 1000) / 3600.0
+        self.multiplicador = multiplicador_velocidad
+        self.activo = True
+        self.cuadros_por_segundo = 30
+        
+    def run(self):
+        for segmento in self.trazos:
+            if not self.activo: break
+            puntos_gps = segmento['geometria']
+            tipo_movimiento = segmento['modo']
+            destino_nombre = segmento['destino']
+            
+            if tipo_movimiento == 'Micro':
+                metros_por_segundo = (20.0 * 1000) / 3600.0
+            else:
+                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
+                
+            for indice in range(len(puntos_gps) - 1):
+                if not self.activo: break
+                punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
+                metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
+                if metros_distancia == 0: continue
+                segundos_reales = metros_distancia / metros_por_segundo
+                segundos_animacion = segundos_reales / self.multiplicador
+                cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
+                salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
+                salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
+                minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
+                
+                for frame in range(cantidad_frames):
+                    if not self.activo: break
+                    latitud_dibujada = punto_a[0] + salto_latitud * frame
+                    longitud_dibujada = punto_a[1] + salto_longitud * frame
+                    self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
+                    self.senal_reloj.emit(minutos_reloj_simulado)
+                    time.sleep(1.0 / self.cuadros_por_segundo)
+                    
+            if self.activo:
+                self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
+                self.senal_llegada.emit(destino_nombre)
+                self.activo = False 
 ```
 
----
+### 2.3. Agente Basado en Objetivos (`AgenteTransporte`)
+Posee la meta absoluta de guiar al turista desde su origen hasta su destino final. Lee la matriz de micros y coordina los despachos conectando todas las señales.
 
-### 2.4. Definición Matemática y Lógica de los 3 Modos de Transporte
-
-1. **Justificación (Teoría):** 
-   Nuestra Inteligencia Artificial no asume que el turista se teletransporta. Para modelar la Noche de Museos con realismo físico y económico, definimos tres "Modos de Transporte" que interactúan con el Presupuesto y el Tiempo del usuario:
-   - **Modo Pie (Peatón):** Se utiliza la Interfaz de Programación de Aplicaciones externa en su perfil peatonal. Ignora el tráfico y el sentido único de las calles vehiculares. Su costo monetario es `0.0 Bs`.
-   - **Modo Auto (Taxi):** Llama al servidor en perfil vehicular. Está atado a un multiplicador de costo (taxímetro lógico de `5.0 Bs por kilómetro`).
-   - **Modo Micro (Transporte Público):** Es la red híbrida más compleja. Implica medir la caminata del turista hacia la parada, el viaje en la ruta estática del archivo de vectores geográficos, y la caminata final. El pasaje es estático (`3 Bs`). Si tomar el micro es más lento o caro que simplemente ir a pie directo, la heurística descarta la opción "Micro".
-
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Esta es lógica central del negocio puramente programada en Python mediante bloques condicionales (`if/elif`).
-
-3. **Código de Ejecución en el Proyecto:**
-   El motor físico en `agentes_ia.py` define una función interna `calcular_segmento` que se encarga de ramificar la lógica según el tipo de viaje que la IA esté evaluando en ese milisegundo:
 ```python
-# Extracto de agentes_ia.py -> AgenteBuscador -> calcular_segmento()
+class AgenteTransporte:
+    def __init__(self, consola_ui, web_ui, funcion_dinero, funcion_tiempo):
+        self.consola = consola_ui
+        self.visor_mapa = web_ui
+        self.restar_plata = funcion_dinero
+        self.restar_reloj = funcion_tiempo
+        self.ruta_actual = None
+        self.indice_tramo = 0
+        self.animacion = None
+        
+    def arrancar_motor(self, datos_ruta, velocidad_coche, velocidad_caminando, acelerador, funcion_llegada):
+        if self.animacion and self.animacion.isRunning():
+            self.animacion.activo = False
+            self.animacion.wait()
+        self.ruta_actual = datos_ruta
+        self.indice_tramo = 0
+        self.evento_llegada = funcion_llegada
+        self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
+        self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
+        
+    def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
+        if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
+            segmento = self.ruta_actual['geometrias'][self.indice_tramo]
+            
+            costo_monetario = segmento.get('costo', 0)
+            if costo_monetario > 0:
+                self.restar_plata(costo_monetario, f"boleto de {segmento['modo']}")
+                
+            color_pintura = "purple" if segmento['modo'] == 'Micro' else "red"
+            es_punteada = "true" if segmento['modo'] == 'Pie' else "false"
+            self.visor_mapa.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_pintura}', {es_punteada});")
+            
+            self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
+            self.animacion.senal_coordenada.connect(self.refrescar_pantalla)
+            self.animacion.senal_reloj.connect(self.restar_reloj)
+            self.animacion.senal_llegada.connect(self.aterrizaje)
+            self.animacion.start()
+            self.velocidad_coche = velocidad_coche
+            self.velocidad_caminando = velocidad_caminando
+            self.acelerador = acelerador
 
-if tipo_viaje == 'Pie':
-    # El peatón consulta su propio servidor de rutas peatonales
-    _, _, geom_p = obtener_ruta_vehiculo(coord_a, coord_b, perfil="peaton")
-    precio_pasaje = 0.0
+    def refrescar_pantalla(self, latitud, longitud, transporte):
+        color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
+        self.visor_mapa.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({latitud}, {longitud}, '{color_icono}');")
 
-elif tipo_viaje == 'Auto':
-    # El coche extrae la distancia del servidor driving y calcula el costo según taxímetro
-    d_vehiculo, t_vehiculo, geom_vehiculo = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
-    precio_pasaje = self.costo_coche * d_vehiculo
-
-elif tipo_viaje == 'Micro':
-    # Lógica de Matriz de Transporte para emparejar la línea del archivo de vectores geográficos
-    info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
-    id_linea = info_ruta['lineas_disponibles'][0]
-    ruta_fisica = LINEAS_TRUFIS.get(id_linea)
-    precio_pasaje = 3.0 # Tarifa única de trufi/micro
+    def aterrizaje(self, nombre_destino):
+        self.indice_tramo += 1
+        self.evento_llegada(nombre_destino, lambda: self.siguiente_movimiento(self.velocidad_coche, self.velocidad_caminando, self.acelerador))
 ```
 
----
+### 2.4. Agente Basado en Utilidad (`AgenteBuscador` y Poda Algorítmica)
+La joya de la corona. Compara miles de rutas descartando aquellas que sobrepasan el Presupuesto y el Tiempo usando Recursividad (Búsqueda en Profundidad).
 
-### 2.5. Arquitectura de Almacenamiento Caché (Peatonal y Taxi)
-
-1. **Justificación (Teoría):** 
-   ¿Por qué creamos cachés? El proveedor de calles físicas impone reglas estrictas para evitar saturación de servidores (límites de peticiones por segundo). Si la Inteligencia Artificial intentara calcular los millones de combinaciones de la Noche de Museos preguntando a internet por cada cruce, el programa tardaría días en responder y nuestra conexión sería bloqueada mundialmente.
-   - *Solución:* Creamos dos bancos de memoria local (`cache_peatonal.json` y `cache_taxi.json`). Calculamos todas las rutas existentes entre todos los museos una sola vez. Cuando el usuario hace clic en "Calcular", el Agente ya no acude a internet; lee los archivos del disco duro y los carga en la Memoria de Acceso Aleatorio del sistema, haciendo que la Inteligencia Artificial resuelva la ruta perfecta en una fracción de segundo.
-
-2. **Comando de Terminal (Instalación):** 
-   Antes de abrir la interfaz por primera vez, el ingeniero debe popular (llenar) los cachés vacíos con este comando:
-   ```bash
-   python precalcular_rutas.py
-   ```
-
-3. **Código de Ejecución en el Proyecto:**
-   El código extrae la información y luego usa un mecanismo de volcado inteligente con espaciado (`indent=4`) para que los archivos temporales no se encripten en una sola línea interminable, sino que sean fáciles de inspeccionar por un ser humano:
 ```python
-# Extracto de configuracion.py -> guardar_memoria()
-import json
-
-def guardar_memoria(perfil="driving"):
-    # Bifurcación entre Caché Peatonal y Caché de Taxi
-    if perfil == 'peaton':
-        with open("cache_peatonal.json", "w", encoding="utf-8") as archivo:
-            # indent=4 formatea el archivo hacia abajo, haciéndolo legible
-            json.dump(memoria_peaton, archivo, indent=4)
-    else:
-        with open("cache_taxi.json", "w", encoding="utf-8") as archivo:
-            json.dump(memoria_taxi, archivo, indent=4)
-```
-
----
-
-### 2.6. Arquitectura Multi-Agente (Los 4 Agentes del Proyecto)
-
-1. **Justificación (Teoría):** 
-   Para evitar que la interfaz gráfica se congele o bloquee mientras la computadora piensa, el proyecto usa un sistema concurrente basado en "Agentes". Cada agente es un hilo de procesamiento independiente.
-   - `AgenteBuscador`: El cerebro matemático. Explora millones de permutaciones en segundo plano.
-   - `AnimadorMovimiento`: El motor físico. Calcula los fotogramas para mover el auto en el mapa de forma fluida.
-   - `AgenteGuia`: Un temporizador estático que cobra la entrada y emite señales de espera mientras el usuario "visita" el museo.
-   - `AgenteTransporte`: El coordinador maestro que ordena a los otros agentes cuándo actuar y dibuja las líneas visuales en el mapa interactivo.
-
-2. **Comando de Terminal (Instalación):** 
-   Al depender directamente del núcleo del framework Qt para el paralelismo seguro, basta con tener PyQt instalado:
-   ```bash
-   pip install PyQt5
-   ```
-
-3. **Código de Ejecución en el Proyecto:**
-   En `agentes_ia.py`, los agentes se crean heredando de `QThread`. Se usan `pyqtSignal` para mandar mensajes hacia la ventana principal de manera segura.
-```python
-# Creación y configuración del Agente en agentes_ia.py
-from PyQt5.QtCore import QThread, pyqtSignal
-
 class AgenteBuscador(QThread):
-    # Señales para comunicarse con la UI sin congelarla
-    ruta_encontrada = pyqtSignal(list, float, float)
-    mensaje_consola = pyqtSignal(str)
+    progreso_senal = pyqtSignal(str)
+    finalizado_senal = pyqtSignal(list)
+    error_senal = pyqtSignal(str)
+    
+    def __init__(self, origen, museos, presupuesto, tiempo, vel_auto, vel_pie, tiempo_museo, permitir_pie=True, permitir_taxi=True, permitir_micro=True):
+        super().__init__()
+        self.coordenada_origen = origen
+        self.lista_museos = museos
+        self.presupuesto_maximo = presupuesto
+        self.tiempo_maximo = tiempo
+        self.velocidad_coche = vel_auto / 60.0
+        self.velocidad_caminando = vel_pie / 60.0
+        self.duracion_visita = tiempo_museo
+        self.costo_coche = 5.0
+        self.permitir_pie = permitir_pie
+        self.permitir_taxi = permitir_taxi
+        self.permitir_micro = permitir_micro
 
     def run(self):
-        # Lógica de búsqueda principal en hilo secundario
-        self.buscar_rutas_dfs(...)
-        self.mensaje_consola.emit("Búsqueda finalizada con éxito.")
-```
+        try:
+            coordenadas = {'Origen': self.coordenada_origen}
+            for museo in self.lista_museos: 
+                coordenadas[museo] = MUSEOS[museo]
 
-### 2.6.1. Clasificación Teórica de la Inteligencia Artificial (Taxonomía)
+            rutas_encontradas = []
+            cantidad_museos = len(self.lista_museos)
+            total_combinaciones = sum(math.factorial(cantidad_museos) // math.factorial(cantidad_museos - k) for k in range(1, cantidad_museos + 1))
+            self.contador_exploracion = 0
 
-1. **Justificación (Teoría):** 
-   Nuestra arquitectura no fue diseñada al azar por nuestro equipo. Está fundamentada estrictamente en la taxonomía clásica de la Inteligencia Artificial (basada en Russell y Norvig), que hemos adaptado a la geografía y dinámica de los museos de la ciudad de Cochabamba:
-   - **Agente Reactivo Simple (`AgenteGuia`):** Toma decisiones basadas únicamente en la percepción del momento actual. Por ejemplo, si el turista llega a la puerta del "Convento Museo Santa Teresa", nuestro agente no recuerda si el turista vino en Trufi o caminando; simplemente reacciona, cobra la entrada de 15 Bs e inicia el temporizador de visita.
-   - **Agente Reactivo Basado en Modelos (`AnimadorMovimiento`):** Desarrollamos este agente para que mantenga un estado interno sobre cómo es el mundo físico. Calcula de forma determinista dónde debe estar el ícono del vehículo en el siguiente fotograma para generar la ilusión de movimiento.
-   - **Agente Basado en Objetivos (`AgenteTransporte`):** Le programamos la meta absoluta de guiar al turista desde su punto de origen hasta su destino final. Es el orquestador maestro que lee nuestra matriz de rutas de micros de Cochabamba y coordina los despachos del motor de animación.
-   - **Agente Basado en Utilidad (`AgenteBuscador`):** La joya de nuestro proyecto. Su objetivo no es simplemente llegar a la "Casona de Santiváñez", sino que evalúa una función de *utilidad* y *poda algorítmica*. Compara miles de rutas descartando aquellas que sobrepasan el Presupuesto y el Tiempo para maximizar la recompensa del turista.
+            # (Omitimos funciones internas repetitivas de cálculo por legibilidad en el reporte, pero el nucleo de poda es el siguiente:)
+            
+            def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
+                # ----- PODA MATEMÁTICA -----
+                if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+                    m = len(museos_faltantes)
+                    ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+                    self.contador_exploracion += ramas_cortadas
+                    
+                    texto_camino = [x[:3] for x in camino_actual] + [m[:3] for m in museos_faltantes] + ['Origen']
+                    cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
+                    registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                    registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
+                    self.progreso_senal.emit("\n".join(registro_final))
+                    return
+                # ---------------------------
 
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Esta clasificación es el pilar de la programación de las clases en `agentes_ia.py`.
+                # Si ya visitamos lo planificado, verificamos el retorno al origen
+                if not museos_faltantes:
+                    return
 
-3. **Código de Ejecución en el Proyecto (Implementación Real):**
-   Las clases en `agentes_ia.py` contienen el código real que ejecuta estas teorías:
+                for siguiente_museo in museos_faltantes:
+                    origen_tramo = camino_actual[-1]
+                    destino_tramo = siguiente_museo
+                    coord_origen_tramo, coord_destino_tramo = coordenadas[origen_tramo], coordenadas[destino_tramo]
+                    distancia_recta = calcular_distancia_directa(coord_origen_tramo, coord_destino_tramo)
+                    
+                    opciones_transporte = []
+                    if modo_fijo == 'Pie': opciones_transporte.append('Pie')
+                    elif modo_fijo == 'Auto': opciones_transporte.append('Auto')
+                    elif modo_fijo == 'Micro':
+                        if origen_tramo in MATRIZ_TRANSPORTE and destino_tramo in MATRIZ_TRANSPORTE[origen_tramo]:
+                            opciones_transporte.append('Micro')
 
-```python
-# 1. AGENTE BASADO EN UTILIDAD (AgenteBuscador)
-# Aplica la "Poda": Descarta la rama si la utilidad (Costo/Tiempo) supera las restricciones.
-if costo_total_evaluado <= self.presupuesto_maximo and tiempo_total_evaluado <= self.tiempo_maximo:
-    # Maximiza la recompensa guardando la ruta válida en la matriz
-    rutas_encontradas.append({
-        'numero_operacion': self.contador_exploracion,
-        'cantidad_museos': len(camino_actual) - 1, # La utilidad máxima a conseguir
-        'dinero_gastado': costo_total_evaluado
-    })
+                    for tipo_transporte in opciones_transporte:
+                        # ... Se calculan tramos y segmentos de coordenadas ...
+                        costo_calculado = gasto_acumulado + ENTRADAS[destino_tramo] + 0.0 # Más costo transporte
+                        tiempo_calculado = reloj_acumulado + self.duracion_visita + 0.0 # Más tiempo transporte
+                        
+                        sobrantes = [m for m in museos_faltantes if m != siguiente_museo]
+                        
+                        # ----- LLAMADA RECURSIVA (DFS) -----
+                        explorar_opciones(camino_actual + [siguiente_museo], sobrantes, costo_calculado, tiempo_calculado, trazos_ruta, lineas_registro, modo_fijo)
 
-# 2. AGENTE REACTIVO BASADO EN MODELOS (AnimadorMovimiento)
-# Mantiene el modelo del mundo físico interpolando el espacio y tiempo (Física real)
-fraccion = fotograma_actual / total_fotogramas
-lat = lat_a + (lat_b - lat_a) * fraccion
-lon = lon_a + (lon_b - lon_a) * fraccion
-# Altera el entorno mandando la nueva coordenada a la Capa Visual
-self.senal_coordenada.emit(lat, lon, modo_transporte)
-
-# 3. AGENTE BASADO EN OBJETIVOS (AgenteTransporte)
-# Cumple el objetivo principal delegando tareas y conectando eventos asíncronos.
-def despachar_ruta(self):
-    self.animador = AnimadorMovimiento(self.ruta['geometrias'], ...)
-    # Si el animador llega al objetivo, el Agente Transporte toma el control de nuevo
-    self.animador.senal_llegada.connect(self.procesar_llegada)
-    self.animador.start()
-
-# 4. AGENTE REACTIVO SIMPLE (AgenteGuia)
-# Actúa sobre reglas simples Si-Entonces. Cobra entrada y restaura el control.
-def run(self):
-    tiempo_espera = self.duracion / self.multiplicador
-    time.sleep(tiempo_espera) # Reacción: Detener a la persona en el museo
-    self.senal_cobro.emit(self.costo_entrada) # Reacción: Cobrar dinero
-    self.senal_fin.emit()
+            # Inicia la rama recursiva base
+            if self.permitir_pie: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Pie')
+            if self.permitir_taxi: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Auto')
+            if self.permitir_micro: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Micro')
+                
+            if rutas_encontradas:
+                max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
+                rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+                self.finalizado_senal.emit(rutas_validas)
+            else:
+                self.finalizado_senal.emit([])
+        except Exception as error_capturado:
+            self.error_senal.emit(str(error_capturado))
 ```
 
 ---
 
-### 2.7. Motores de Búsqueda, Macro-Operadores y Poda Lógica
+## CAPÍTULO III: DISEÑO DEL SISTEMA Y SOLUCIONES DE INGENIERÍA
 
-1. **Justificación (Teoría):** 
-   Un **Macro-Operador** en IA es una abstracción que agrupa acciones complejas. Aquí, nuestro macro-operador es "Viajar del Museo A al B usando el mejor transporte". 
-   - **Validación y Descartes (Poda):** El agente explora usando el algoritmo de **Búsqueda en Profundidad** (un método matemático para explorar todas las combinaciones posibles llegando hasta el final de cada camino). Si al intentar usar el macro-operador hacia el siguiente museo nota que el costo acumulado supera el Presupuesto, o el reloj rebasa el Tiempo Límite, se activa la "Poda" (el descarte inmediato de esa ruta). La rama se invalida y el agente retrocede sin seguir calculando rutas imposibles.
-   - **Los Cachés (Recordatorio):** Toda la información requerida por los macro-operadores para calcular estas distancias instantáneamente se lee de los archivos locales `cache_peatonal.json` y `cache_taxi.json`. Sin ellos, la poda tardaría días en lugar de milisegundos.
+### 3.1. Concurrencia y Paralelismo
+Como evidenciamos en el código del Capítulo II, todas las clases pesadas heredan de `QThread`. Si en Python intentáramos hacer recursividad factorial pura en el hilo principal de la computadora, el sistema operativo de Windows o Linux asumiría que el programa se colgó. Al instanciar las clases con `.start()` enviamos esa matemática a un hilo en segundo plano (Background Thread), dejando la interfaz visual receptiva.
 
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Matemáticas de Árboles y Grafos puras.
+### 3.2. Mecanismos de Almacenamiento Caché Dual
+No podemos pedirle mil veces por minuto la ruta al servidor en la nube de OSRM; nos bloquearían por ataque DDOS. Desarrollamos un sistema `cache_peatonal.json` y `cache_taxi.json`. El programa pregunta primero si ya calculamos la distancia entre dos puntos; si existe, lo extrae en 0 milisegundos, si no, va a internet y lo guarda.
 
-3. **Código de Ejecución en el Proyecto:**
 ```python
-# Lógica de Validación y Poda en agentes_ia.py -> AgenteBuscador
-def dfs(nodo_actual, museos_faltantes, ruta_actual, tiempo_acumulado, costo_acumulado):
-    # Validación (Descarte)
-    if tiempo_acumulado > self.tiempo_disponible or costo_acumulado > self.presupuesto_disponible:
-        self.mensaje_consola.emit(f"PODA: Límite excedido hacia {nodo_actual}")
-        return # Finaliza esta rama inmediatamente
+# Lógica real de configuracion.py para mitigar latencias de red
+def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
+    memoria_activa = memoria_peaton if perfil == "peaton" else memoria_taxi
+    llave = f"{origen[0]},{origen[1]}_{destino[0]},{destino[1]}"
+    
+    if llave in memoria_activa:
+        return memoria_activa[llave][0], memoria_activa[llave][1], memoria_activa[llave][2]
         
-    # Continuación usando macro-operadores de transporte
-    for sig_nodo in museos_faltantes:
-        tramos = calcular_segmento(nodo_actual, sig_nodo...)
-        # Evaluar recursivamente las siguientes combinaciones
-```
-
----
-
-### 2.8. Cinemática: Cálculos de Tiempo por Tramo
-
-1. **Justificación (Teoría):** 
-   ¿Cómo sabe la computadora cuánto tiempo demorará un auto en recorrer Cochabamba? A través de cinemática básica adaptada al espacio geográfico: **`Tiempo = Distancia / Velocidad`**. 
-   La API nos devuelve la `Distancia` matemática real del tramo, y la interfaz gráfica le provee a la IA la `Velocidad` seleccionada por el usuario (ej. Caminando a 5 km/h, Coche a 40 km/h).
-
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-```python
-# Fragmentos de cálculo de tiempo en agentes_ia.py
-if tipo_viaje == 'Pie':
-    # La API entrega la distancia_total_tramo en kilómetros
-    # Se divide entre la velocidad del humano y se obtiene el tiempo en horas
-    tiempo_total_tramo = distancia_total_tramo / self.velocidad_caminando
-
-elif tipo_viaje == 'Auto':
-    tiempo_total_tramo = distancia_total_tramo / self.velocidad_coche
-```
-
----
-
-### 2.9. Filtrado y Despliegue de Resultados (Historial de Rutas)
-
-1. **Justificación (Teoría):** 
-   Si el turista elige 10 museos pero solo tiene tiempo para 3, el sistema no falla. A medida que la Búsqueda en Profundidad avanza, inyecta su "Número de Operación" en las rutas que lograron cumplir los límites de presupuesto y tiempo.
-   Al finalizar, el servidor extrae la cantidad máxima de museos alcanzada por la mejor ruta, y devuelve un **Historial Exhaustivo** a la pantalla ordenado cronológicamente según cómo fueron validados, mostrando el identificador de la operación para mantener un registro transparente.
-
-2. **Comando de Terminal (Instalación):** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-   Este bloque inyecta la operación y devuelve los ganadores (Extracto de `agentes_ia.py`):
-```python
-# Lógica de Extracción Final en agentes_ia.py
-rutas_encontradas.append({
-    'numero_operacion': self.contador_exploracion,
-    'nombre_ruta': " -> ".join([abreviar(x) for x in camino_actual[1:]]),
-    'cantidad_museos': len(camino_actual) - 1,
-    # ... otros metadatos
-})
-
-if rutas_encontradas:
-    # 1. ¿Cuál es el récord de museos visitados?
-    max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
+    url = f"https://router.project-osrm.org/route/v1/{perfil}/{origen[1]},{origen[0]};{destino[1]},{destino[0]}?overview=full&geometries=polyline"
     
-    # 2. Rescatar solo las rutas que igualan el récord
-    rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+    import time
+    time.sleep(0.3) # Rate limit protection
+    headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
+    respuesta = requests.get(url, headers=headers, timeout=5)
+    datos = respuesta.json()
     
-    # 3. Enviar todo el historial a la interfaz en su orden original
-    self.finalizado_senal.emit(rutas_validas)
+    if datos.get('code') == 'Ok':
+        ruta_obtenida = datos['routes'][0]
+        # Guardado en memoria
+        # ...
 ```
 
 ---
 
-## SECCIÓN III: MANUAL OPERATIVO PARA EL USUARIO DEL SIMULADOR
+## CAPÍTULO IV: GUÍA OPERATIVA (MANUAL DE USUARIO)
 
-El simulador que hemos desarrollado, a pesar de tener toda la carga algorítmica y teórica expuesta previamente, dispone de una Interfaz de Usuario que nuestro equipo diseñó ergonómicamente. A continuación explicamos los pasos y lógica de uso:
+El usuario controla toda la simulación mediante el módulo gráfico. Nuestro equipo mapeó y capturó los ingresos mediante señales lógicas:
 
-### PASO 1: Ingreso de Variables Estructurales (Módulo Izquierdo)
+1. **Definición de Origen y Restricciones:** Se debe ingresar los `Bolivianos` y los `Minutos` disponibles en las cajas estandarizadas.
+2. **Definir la Cinemática:** Seleccionar a qué velocidad camina la persona (km/h) y elegir la Aceleración global (ej. x10) para ver rápido los resultados.
+3. **Selección de la Matriz (Museos):** Marcar las casillas de los recintos culturales que el grupo de turistas tiene pensado visitar en Cochabamba.
+4. **Ejecución:** Al hacer clic en "Calcular", se disparan las validaciones de UI, se bloquean los botones y se envía la información a `AgenteBuscador`.
 
-1. **Justificación (Teoría):** 
-   - **Posición Inicial:** El turista no puede ir a ningún museo si no hay punto de partida (Origen). Debe introducir el nombre de la plaza y oprimir el botón **Origen**. Si el sistema falla por no reconocer el nombre, el usuario puede simplemente hacer **clic** en el mapa de la derecha; este interactúa vía un puente de programación web y retorna las coordenadas directamente al programa local.
-   - **Restricción Económica:** Todo trayecto resta dinero. Se debe asignar el presupuesto en Bolivianos.
-   - **Restricción Temporal:** El evento tiene hora límite. Se ajusta el tiempo (en minutos).
-
-2. **Comando de Terminal:** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-   Extracción de datos en `ui_ventana.py`:
 ```python
-# Capturando los datos estructurales del turista
+# Extracción desde la Ventana UI
 dinero_disponible = self.spin_presupuesto.value()
 tiempo_disponible = self.spin_tiempo.value()
-
-# Conexión del botón Origen
-self.btn_origen.clicked.connect(self.buscar_origen)
-```
-
-### PASO 2: Configuración de Cinemática Física y Realidad Simulada
-
-1. **Justificación (Teoría):** 
-   - **Velocidad de Translación:** Ajuste mediante la caja numérica a qué velocidad avanza el peatón o el coche. 
-   - **Duración de la Visita al Museo:** Lapso estático en minutos dentro de las exposiciones.
-   - **Acelerador:** Multiplicador temporal. Un viaje real de 10 minutos puede correr fluidamente a lo largo de 60 segundos si elige aceleración x10.
-   - **Modos de Transporte Permitidos:** Mediante tres casillas de verificación, usted decide qué vehículos usar (Pie, Taxi, Micro). Si deshabilita alguna opción, el sistema jamás recomendará usarla.
-
-2. **Comando de Terminal:** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-```python
-# Extrayendo la física desde la interfaz
-vel_coche = self.spin_vel_coche.value()
-vel_pie = self.spin_vel_pie.value()
 acelerador = float(self.combo_acelerador.currentText().replace('x', ''))
 
-# Verificando qué modos están habilitados
-modos_permitidos = []
-if self.check_pie.isChecked(): modos_permitidos.append('Pie')
-if self.check_taxi.isChecked(): modos_permitidos.append('Auto')
-if self.check_micro.isChecked(): modos_permitidos.append('Micro')
-```
-
-### PASO 3: Selección de Criterios (Los Museos)
-
-1. **Justificación (Teoría):** 
-   El simulador despliega una lista interactiva de los museos incorporados al evento. Active la **casilla de verificación** de cada lugar que su grupo quiera explorar. 
-   *Advertencia algorítmica:* Seleccionar los 23 museos hará imposible que el simulador respete las variables temporales y de costo; el sistema desechará rutas imposibles automáticamente.
-
-2. **Comando de Terminal:** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-   El código barre la lista visual y extrae solo las opciones que el usuario marcó:
-```python
-# Extrayendo los museos seleccionados
-museos_seleccionados = []
-for i in range(self.lista_interfaz_museos.count()):
-    elemento = self.lista_interfaz_museos.item(i)
-    if elemento.checkState() == Qt.Checked:
-        museos_seleccionados.append(elemento.text())
-```
-
-### PASO 4: Compilación, Ejecución Matemática y Emulación
-
-1. **Justificación (Teoría):** 
-   - **Calcular:** Ejecuta la red neuronal matemática. Le enseñará qué trayectos descartó mediante poda para ahorrar sus recursos computacionales y de tiempo. Entregará en la caja inferior las únicas alternativas viables con instrucciones exactas.
-   - **Iniciar:** El sistema deshabilitará todos los botones (para proteger los procesos matemáticos internos) y comenzará a mover el indicador sobre las calles bolivianas siguiendo la geometría real. El reloj interno y los contadores en la parte baja (`Presupuesto` y `Tiempo`) bajarán progresivamente hasta culminar.
-
-2. **Comando de Terminal:** 
-   *No aplica.*
-
-3. **Código de Ejecución en el Proyecto:**
-   Lanzamiento del Hilo Concurrente:
-```python
-# Bloqueo de interfaz e inicio del cálculo en segundo plano
-self.btn_calcular.setEnabled(False)
-self.btn_iniciar.setEnabled(False)
-
-# Envío de parámetros al Agente
+# Iniciar multithreading seguro
 self.agente_buscador = AgenteBuscador(
     origen=self.origen, 
     museos=museos_seleccionados, 
     presupuesto=dinero_disponible, 
-    #... etc
+    tiempo=tiempo_disponible,
+    # ...
 )
-self.agente_buscador.start() # Inicia el Multithreading
+self.agente_buscador.start()
 ```
+
+Cuando el Agente termina su recursividad, la interfaz recibe la matriz de ganadores y despliega el **Historial de Operaciones Validadas** en pantalla, demostrando que la Inteligencia Artificial encontró el trayecto perfecto.
