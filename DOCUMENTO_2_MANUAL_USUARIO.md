@@ -5,127 +5,60 @@
 
 ---
 
-## RESUMEN EJECUTIVO
-El presente informe de Inteligencia Artificial documenta exhaustivamente el marco teórico, el diseño de la arquitectura, la abstracción matemática y el desarrollo del algoritmo del simulador "Noche de Museos Cochabamba". Hemos estructurado este documento bajo el formato académico de Tesina, exponiendo sin recortes el código fuente, la taxonomía teórica aplicada y el análisis de complejidad que nuestro equipo desarrolló para resolver un derivado del Problema del Viajante de Comercio sometido a restricciones multimodales en el entorno urbano.
+## CAPÍTULO I: INSTALACIONES Y CONFIGURACIONES BÁSICAS
 
----
-
-## CAPÍTULO I: INTRODUCCIÓN Y CONFIGURACIÓN DEL ENTORNO DE DESARROLLO
-
-La construcción de un simulador geográfico de Inteligencia Artificial requiere una base tecnológica sólida y escalable. Para este proyecto, el ecosistema de desarrollo ha sido meticulosamente seleccionado considerando el rendimiento en la asignación de memoria y la capacidad computacional para manejar procesos concurrentes.
-
-### 1.1. Instalación de Python y Entornos Virtuales
-Nuestro equipo seleccionó **Python 3** como el lenguaje de programación base. La decisión se fundamenta en su intérprete de alto nivel, que gestiona automáticamente el liberador de memoria y permite el manejo eficiente de diccionarios en memoria (tablas de búsqueda rápidas) que son vitales para la ejecución de nuestro algoritmo de Poda. 
-
-Para garantizar que nuestro sistema no entre en conflictos con otras dependencias instaladas a nivel global en el sistema operativo del usuario, hemos implementado el uso de **Entornos Virtuales de Trabajo**. Teóricamente, un entorno virtual actúa como un contenedor de aislamiento que clona el intérprete de Python y encapsula las bibliotecas específicas del proyecto. Su instalación y activación se realizan mediante la interfaz de línea de comandos de la siguiente manera:
-
+### Instalación de Python
+Para este proyecto decidimos usar Python 3 porque es un lenguaje fácil de entender y muy bueno para trabajar con datos y cálculos rápidos. 
+Para que el proyecto funcione sin dañar otros programas de la computadora, creamos un "Entorno Virtual". Un entorno virtual es como una caja separada donde instalamos todo lo que el proyecto necesita sin mezclarlo con el resto de la computadora.
+Se instala y activa en la consola así:
 ```bash
-# Creación del contenedor aislado
 python -m venv venv
-
-# Activación del entorno virtual en plataformas Windows
 venv\Scripts\activate
 ```
 
-### 1.2. Instalación de Bibliotecas Externas y Uso de Bibliotecas Nativas
-El desarrollo de software moderno no consiste en reinventar la rueda, sino en abstraer la complejidad utilizando paquetes precompilados. Hemos dividido nuestras dependencias en dos categorías rigurosas.
+### Instalación y Ejecución de Bibliotecas Externas como Nativas
+Nuestro proyecto usa herramientas adicionales (bibliotecas) para no tener que programar todo desde cero. Las dividimos en dos tipos:
 
-#### A) Bibliotecas Externas (Instalables)
-La instalación se realiza a través del gestor de paquetes de Python. Ejecutamos el siguiente comando unificado:
-```bash
-pip install PyQt5 PyQtWebEngine folium requests polyline geopy
-```
-Cada una de estas librerías cumple una función teórica específica en la arquitectura del sistema:
-- **PyQt5 y PyQtWebEngine:** PyQt5 es una capa de envoltura de Python para un marco de trabajo de interfaces escrito en C++. Teóricamente, funciona mediante un Bucle de Eventos asíncrono y un paradigma de "Señales y Receptores" que permite la comunicación entre el Hilo Principal y los Hilos Secundarios de trabajo en paralelo. PyQtWebEngine invoca directamente al motor de navegación de Google para procesar código web dinámico dentro de nuestro software.
-- **Requests y Polyline:** La librería de peticiones abstrae la complejidad de los conductos de red, permitiendo a nuestro programa establecer conexiones seguras y comunicarse mediante el Protocolo de Transferencia de Hipertexto hacia servidores de arquitectura representacional. Por su parte, la librería de polilíneas es una implementación de un algoritmo matemático que comprime cientos de miles de coordenadas de latitud y longitud (con precisión de 5 decimales) en una sola cadena de caracteres, reduciendo el tamaño del peso de red a fracciones de la capacidad de almacenamiento.
-- **Folium y Geopy:** Folium funciona como un generador dinámico. Transforma comandos abstractos de Python en instrucciones complejas para navegadores web utilizando librerías cartográficas genéricas. Geopy se encarga de ubicar coordenadas y proporciona modelos matemáticos avanzados para el cálculo de distancias terrestres.
+**Bibliotecas Externas:** Son las que tuvimos que descargar de internet usando el comando `pip install`.
+- `PyQt5` y `PyQtWebEngine`: Las usamos para crear la ventana visual del programa y para poder mostrar el mapa de internet adentro de nuestra ventana.
+- `requests` y `polyline`: Sirven para conectarnos a internet a pedir rutas y para descomprimir esas rutas que llegan codificadas.
+- `folium` y `geopy`: Las usamos para dibujar las líneas y marcadores en el mapa, y para ubicar coordenadas.
 
-#### B) Bibliotecas Nativas (Núcleo Interno)
-Para el núcleo de nuestra Inteligencia Artificial, prescindimos del uso de dependencias externas para evitar las demoras y la sobrecarga computacional. Usamos las librerías preinstaladas del núcleo lógico de Python:
-- Módulo Matemático: Provee acceso a funciones de trigonometría esférica de máxima velocidad.
-- Módulo de Combinatoria: Empleado teóricamente para la matemática de permutaciones, vital para generar los caminos del árbol de decisiones.
-- Módulo de Archivos de Texto Estructurado: Implementado para la preservación de datos y la estructuración de la memoria hacia el Disco Duro, formando la base de nuestro almacenamiento temporal de alta velocidad.
-- Módulo de Tiempo y Operaciones del Sistema: El módulo de tiempo instruye al procesador lógico a suspender un subproceso, lo cual es crítico para que la simulación gráfica no se dibuje de golpe en un milisegundo, sino fotograma a fotograma; el módulo operativo nos permite explorar el sistema de carpetas local para la carga de datos geográficos.
+**Bibliotecas Nativas:** Son las que ya vienen instaladas con Python por defecto.
+- `math`: Para hacer cálculos de distancias.
+- `itertools`: Para combinar las listas de los museos.
+- `json`: Para guardar y leer nuestros archivos de rutas guardadas.
+- `time` y `os`: Para pausar la animación de los autitos y para leer carpetas de la computadora.
 
-### 1.3. Instalación e Implementación del Enrutamiento con OpenStreetMap
-Para calcular cómo moverse por la ciudad, una Inteligencia Artificial no puede simplemente trazar una línea recta, ya que los edificios y las calles en contra ruta son obstáculos en el mundo real. 
-
-Implementamos la integración con la base de datos cartográfica mundial libre **OpenStreetMap**, específicamente consumiendo su Motor de Enrutamiento de Código Abierto. Este servidor modela el mapa cartográfico global de OpenStreetMap como un "Grafo Dirigido", donde cada intersección de la ciudad de Cochabamba es un Vértice, y cada calle es un Camino Conector que tiene un "peso" determinado (el límite de velocidad y la dirección obligatoria). Internamente, este servidor ejecuta un algoritmo modificado de "Búsqueda A-Estrella" optimizado para devolver la ruta terrestre más rápida evadiendo casas y muros.
-
-En lugar de instalar y hospedar un conjunto de computadoras locales (lo cual exigiría decenas de miles de megabytes en Memoria de Trabajo solo para procesar el mapa de Bolivia), nuestro equipo desarrolló una arquitectura de consumo local, comunicando a nuestra Inteligencia Artificial directamente con las puertas de acceso públicas alojadas en los servidores mundiales de la nube comunitaria de OpenStreetMap a través del siguiente conducto de red:
-
-```python
-# Conducto de red conectando con el servidor mundial de OpenStreetMap (Motor OSRM)
-url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-
-try:
-    cabeceras = {"User-Agent": "NocheMuseosSimulador/1.0"}
-    respuesta = requests.get(url, headers=cabeceras, timeout=5)
-    datos = respuesta.json()
-    
-    if datos.get('code') == 'Ok':
-        ruta_obtenida = datos['routes'][0]
-        # Extracción de la distancia real en calles y la matemática comprimida
-        distancia_kilos = ruta_obtenida['distance'] / 1000.0
-        puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
-except Exception:
-    pass
-```
-
-### 1.4. Mapeo Inicial: Ubicación y Digitalización de Museos
-La ubicación de los museos no es conocida con anterioridad por ningún algoritmo de Inteligencia Artificial; este es un conocimiento del dominio del problema que debe ser "inyectado".
-Nuestro equipo realizó una labor de digitalización manual, triangulando veintitrés recintos culturales de la ciudad de Cochabamba usando cartografía satelital. Ingresamos estos datos al proyecto en forma de un "Diccionario Constante" inmutable almacenado en la memoria temporal durante el arranque en el archivo de configuraciones. Teóricamente, un Diccionario en Python garantiza tiempos de búsqueda matemáticamente instantáneos, permitiendo a la Inteligencia Artificial buscar ubicaciones inmediatamente de forma paralela.
+### Ubicación de todos los Museos, cómo los ingresamos en el proyecto
+Para saber dónde están los museos, buscamos manualmente las coordenadas (latitud y longitud) de los 23 museos de Cochabamba usando mapas por satélite. 
+Una vez que tuvimos todas las coordenadas, las ingresamos directamente en el código del proyecto creando un "Diccionario". Un diccionario en Python nos permite guardar el nombre del museo y sus coordenadas exactas para que el programa las encuentre al instante.
 
 ```python
 MUSEOS = {
     '[A] Convento Museo Santa Teresa': (-17.389753, -66.157962),
     '[B] Museo Casa Martín Cárdenas': (-17.392648, -66.160518),
     '[C] Casona de Santiváñez': (-17.394425, -66.159162),
-    '[D] Museo Arqueológico UMSS': (-17.395278, -66.157394),
-    '[E] Iglesia de la Compañía de Jesús': (-17.393023, -66.157814),
-    '[F] Casa Departamental de Culturas': (-17.393081, -66.157084),
-    '[G] Salón de Exposiciones Gíldaro Antezana': (-17.393008, -66.156494),
-    '[H] Casona de la UNITEPC': (-17.392542, -66.156150),
-    '[I] Salón de Exposiciones ABAP-CBBA': (-17.392294, -66.156730),
-    '[J] Salón de Exposiciones Mario Unzueta': (-17.391564, -66.155680),
-    '[K] Museo Francisco de Viedma': (-17.387265, -66.150514),
-    '[L] Museo Alcides d\'Orbigny': (-17.373723, -66.153692),
-    '[M] Palacio Portales (Fundación Simón I. Patiño)': (-17.374561, -66.153052),
-    '[N] Casona de Mayorazgo': (-17.365018, -66.174732),
-    '[O] Centro Cultural Juan Wallparrimachi': (-17.388766, -66.187239),
-    '[P] Proyecto mARTadero': (-17.400032, -66.165723),
-    '[Q] Casa del Arquitecto': (-17.396950, -66.159329),
-    '[R] Casona del Banco Solidario': (-17.397657, -66.155581),
-    '[S] Museo Esteban Arze': (-17.396419, -66.172168),
-    '[T] Museo de la Reserva Moral y Estratégica': (-17.398620, -66.156797),
-    '[U] Museo Mariscal Andrés de Santa Cruz': (-17.397133, -66.160901),
-    '[V] Museo de Arte Chinchiri': (-17.385307, -66.262618),
-    '[W] Museo de la Escuela de Armas Mcal. José Ballivián': (-17.378998, -66.143439)
+    # ... (23 museos en total)
 }
-
-ENTRADAS = {clave: 0.0 for clave in MUSEOS.keys()}
 ```
 
 ---
 
-## CAPÍTULO II: ARQUITECTURA DEL SOFTWARE Y FUNDAMENTACIÓN MATEMÁTICA
+## CAPÍTULO II: ARQUITECTURA DEL SISTEMA Y METRICAS
 
-### 2.1. Arquitectura General del Sistema
-El proyecto implementa rigurosamente el Patrón de Diseño Arquitectónico de "Separación de Funciones". El código base está radicalmente separado en:
-1. **La Capa de Presentación Visual:** Un archivo cuyo único objetivo es organizar las ventanas, reaccionar a las acciones del ratón y enviar los datos limpios. Carece de cualquier tipo de inteligencia artificial.
-2. **El Motor Central y la Lógica:** Operan de forma ignorante a la interfaz visual. Procesan las matrices y cálculos puros. Esta separación permite mejorar la Inteligencia sin que falle la interfaz gráfica.
+### Arquitectura del Sistema o Software
+La arquitectura de nuestro programa está separada en dos partes principales para que funcione mejor:
+1. **La Interfaz Visual:** Es el código que dibuja los botones, las listas y el mapa interactivo. Solo se encarga de mostrar cosas al usuario.
+2. **El Motor Lógico:** Es el código que procesa los cálculos matemáticos, las rutas y la inteligencia artificial. Funciona separado de la pantalla para que el programa no se congele mientras piensa.
 
-### 2.2. Cálculo Geodésico: Distancias y Tiempos de Tramo
-Para calcular la distancia entre dos puntos (Paradas de transporte o Museos), no podemos utilizar el Teorema de Pitágoras que solo funciona en planos bidimensionales. Debido a que la Tierra es una esfera, utilizar Pitágoras sobre una matriz de coordenadas angulares generaría un error inmenso a nivel de escala urbana.
-
-Nuestro equipo implementó la **Fórmula del Semiverseno**. Esta fórmula matemática de trigonometría esférica calcula la distancia del círculo máximo entre dos puntos en una esfera dadas sus longitudes y latitudes. Al operar matemáticamente asumiendo el radio promedio de la Tierra de seis mil trescientos setenta y un kilómetros, obtenemos la distancia real en metros, permitiendo que la Inteligencia Artificial analice los trayectos con precisión milimétrica. El cálculo de tiempo simplemente usa la física clásica de dividir distancia sobre velocidad.
+### Cómo se consigue las métricas de medida y distancia, y cómo se calcula
+Para saber la distancia real entre un museo y una parada de micro, no podemos medir una línea recta plana, porque la tierra es redonda. 
+Por eso usamos una fórmula matemática especial llamada **Fórmula de Haversine**. Esta fórmula toma las coordenadas GPS (latitud y longitud) y calcula la distancia tomando en cuenta la curva de la Tierra (usando el radio de la tierra de 6371 kilómetros). Así conseguimos la medida exacta en metros.
 
 ```python
 def calcular_distancia_directa(origen, destino):
-    # Radio medio de la Tierra en kilómetros
-    radio_tierra = 6371.0
-    
-    # Conversión de coordenadas angulares a Radianes puros
+    radio_tierra = 6371.0 # Kilómetros
     latitud_1 = math.radians(origen[0])
     longitud_1 = math.radians(origen[1])
     latitud_2 = math.radians(destino[0])
@@ -134,579 +67,100 @@ def calcular_distancia_directa(origen, destino):
     delta_latitud = latitud_2 - latitud_1
     delta_longitud = longitud_2 - longitud_1
     
-    # Ecuación de Trigonometría Esférica (Fórmula de Semiverseno)
     a = math.sin(delta_latitud / 2)**2 + math.cos(latitud_1) * math.cos(latitud_2) * math.sin(delta_longitud / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     
     return radio_tierra * c
 ```
 
-### 2.3. Modos de Transporte Público y Tramos
-Incorporar Taxis y el caminar como peatón en el proyecto es sencillo, puesto que el usuario dicta el origen y el destino de forma libre. Sin embargo, integrar la red de "Trufis" y "Micros" añade una restricción colosal al algoritmo: **El usuario no decide la ruta, sino que se sube a una línea preexistente**.
-
-Para conseguir estos tramos, extrajimos información cartográfica de datos abiertos agrupada en un archivo geográfico estructurado en texto. Teóricamente, este archivo agrupa propiedades (como el nombre de la línea del transporte) e inyecta "Cadenas de Líneas", las cuales son miles de vértices continuos de coordenadas matemáticas.
-
-Nuestra arquitectura implementa una función robusta que invierte las coordenadas y procesa todo el árbol de caminos. Como en la vida real las personas no abordan el vehículo "dentro" del museo, la Inteligencia Artificial toma cada punto importante y explora a una circunferencia de **cuatrocientos metros**. Si un vértice del Transporte atraviesa ese círculo de colisión, se registra como una "Parada Matemática de Intersección", generando tramos combinados (Caminata a la Parada, Abordaje al Transporte, Descenso, Caminata al Museo). Todo esto es agrupado en la variable estática pre calculada.
-
-```python
-def cargar_rutas_trufis():
-    global LINEAS_TRUFIS
-    archivo_rutas = "rutas_trufis.geojson"
-    if not os.path.exists(archivo_rutas):
-        return {}
-        
-    try:
-        with open(archivo_rutas, "r", encoding="utf-8") as archivo:
-            datos_trufis = json.load(archivo)
-    except Exception:
-        return {}
-        
-    diccionario_lineas = {}
-    for elemento in datos_trufis.get("features", []):
-        propiedades = elemento.get("properties", {})
-        tipo_transporte = propiedades.get("tipo_linea", "TRUFI")
-        nombre_linea = propiedades.get("linea", "Desconocida")
-        identificador = f"{tipo_transporte} {nombre_linea}"
-        
-        geometria = elemento.get("geometry", {})
-        if geometria.get("type") == "LineString":
-            if identificador not in diccionario_lineas:
-                diccionario_lineas[identificador] = []
-            coordenadas_invertidas = [[coordenada[1], coordenada[0]] for coordenada in geometria.get("coordinates", [])]
-            diccionario_lineas[identificador].extend(coordenadas_invertidas)
-            
-    LINEAS_TRUFIS = diccionario_lineas
-    nodos_ciudad = {"Origen": (-17.391, -66.248)}
-    nodos_ciudad.update(MUSEOS)
-    
-    matriz_transportes = {nodo_a: {nodo_b: {'costo_pasaje': float('inf'), 'lineas_disponibles': []} for nodo_b in nodos_ciudad} for nodo_a in nodos_ciudad}
-    
-    # Análisis Geodésico para encontrar Paradas a menos de 400 metros
-    paradas_cercanas = {nodo: set() for nodo in nodos_ciudad}
-    for nombre_nodo, coordenada_nodo in nodos_ciudad.items():
-        for identificador_linea, ruta_linea in diccionario_lineas.items():
-            for punto_ruta in ruta_linea:
-                distancia_a_calle = calcular_distancia_directa(coordenada_nodo, punto_ruta)
-                if distancia_a_calle < 0.4:
-                    paradas_cercanas[nombre_nodo].add(identificador_linea)
-                    break
-                    
-    # Construcción de la Matriz de Transporte Condicional
-    for nodo_origen in nodos_ciudad:
-        for nodo_destino in nodos_ciudad:
-            if nodo_origen == nodo_destino:
-                continue
-            lineas_en_comun = paradas_cercanas[nodo_origen].intersection(paradas_cercanas[nodo_destino])
-            if lineas_en_comun:
-                matriz_transportes[nodo_origen][nodo_destino] = {'costo_pasaje': 3.0, 'lineas_disponibles': list(lineas_en_comun)}
-            elif paradas_cercanas[nodo_origen] and paradas_cercanas[nodo_destino]:
-                matriz_transportes[nodo_origen][nodo_destino] = {'costo_pasaje': 6.0, 'lineas_disponibles': [list(paradas_cercanas[nodo_origen])[0], list(paradas_cercanas[nodo_destino])[0]]}
-                    
-    return matriz_transportes
-
-MATRIZ_TRANSPORTE = cargar_rutas_trufis()
-```
+### Instalación e Implementación de Cálculo de Tiempo por Tramo
+Una vez que calculamos cuántos metros o kilómetros hay en un tramo, calculamos el tiempo usando la regla básica de la física: Tiempo es igual a Distancia dividida entre la Velocidad. 
+El usuario elige a qué velocidad camina la persona y a qué velocidad va el auto. Luego el sistema divide los kilómetros del tramo entre esa velocidad para saber exactamente cuántos minutos tardará el viaje.
 
 ---
 
-## CAPÍTULO III: OPTIMIZACIÓN Y BÚSQUEDA MATEMÁTICA
+## CAPÍTULO III: MAPAS Y RUTAS DE TRANSPORTE
 
-### 3.1. Instalación e Implementación del Motor de Búsqueda de Profundidad y Operadores Lógicos
-El corazón que resuelve nuestro problema pertenece a la familia de algoritmos de Búsqueda y Planificación. Nuestro equipo implementó una variante de la **Búsqueda en Profundidad Limitada** basada en repeticiones consecutivas e invocaciones a sí misma. 
-
-Teóricamente, el algoritmo examina un camino hijo hasta llegar al destino más lejano, y si no sirve, retrocede hacia el nivel superior evaluando otras calles.
-Sin embargo, calcular el costo de caminar cuadra por cuadra hasta un transporte público es altamente propenso a saturar la Memoria.
-La solución de nuestro equipo fue desarrollar **Operadores Agrupados de Acción** (Macrooperadores). En la academia de Inteligencia Artificial, esto es la agrupación lógica de múltiples acciones básicas (Ej. Dar Paso Uno, Paso Dos, Subir, Esperar, Bajar) encapsuladas en un solo "Bloque Lógico de Movimiento Gigante". Esto comprime el árbol inmensamente, optimizando la capacidad lógica del sistema.
-
-A continuación, exponemos la función matemática que crea este Operador Agrupado de Acción (Macrooperador), unificando el costo, el tiempo, la caminata y el abordaje al micro en una sola matriz indivisible:
+### Instalación, Ejecución e Implementación de OpenStreetMap
+Para saber por qué calles debe ir el auto o la persona caminando, implementamos la base de datos libre **OpenStreetMap**. 
+OpenStreetMap funciona como un servidor en internet que tiene registradas todas las calles, direcciones y si una calle es de sentido único. Nuestro proyecto se conecta por internet a este servidor y le envía las coordenadas de inicio y fin. El servidor de OpenStreetMap nos devuelve la ruta dibujada para que el autito no atraviese casas ni vaya en contra ruta.
 
 ```python
-def calcular_segmento(nodo_a, nodo_b, coord_a, coord_b, tipo_viaje, distancia_lineal):
-    segmentos = []
-    
-    # 1. Operador Simple (Caminata Peatonal)
-    if tipo_viaje == 'Pie':
-        distancia_total_tramo = distancia_lineal * 1.1 
-        tiempo_total_tramo = distancia_total_tramo / self.velocidad_caminando
-        _, _, geom_p = obtener_ruta_vehiculo(coord_a, coord_b, perfil="peaton")
-        geom = geom_p if geom_p else [coord_a, coord_b]
-        precio_pasaje = 0.0
-        impresion_modo = "Pie"
-        segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Pie', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
-    
-    # 2. Operador Simple (Taxi Automóvil)
-    elif tipo_viaje == 'Auto':
-        d_vehiculo, t_vehiculo, geom_vehiculo = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
-        if geom_vehiculo is None:
-            distancia_total_tramo = distancia_lineal * 1.3
-            geom = [coord_a, coord_b]
-            tiempo_total_tramo = distancia_total_tramo / self.velocidad_coche
-        else:
-            distancia_total_tramo = d_vehiculo
-            geom = geom_vehiculo
-            tiempo_total_tramo = t_vehiculo
-        precio_pasaje = self.costo_coche * distancia_total_tramo
-        impresion_modo = "Auto"
-        segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Auto', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
-    
-    # 3. Operador Agrupado Gigante (Caminata + Micro + Caminata)
-    elif tipo_viaje == 'Micro':
-        info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
-        id_linea = info_ruta['lineas_disponibles'][0]
-        ruta_fisica = LINEAS_TRUFIS.get(id_linea)
-        
-        if ruta_fisica:
-            def ubicar_paradas(punto_inicio, punto_fin, coordenadas_ruta):
-                candidatos_inicio = [(idx, calcular_distancia_directa(punto_inicio, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_inicio, coord) < 0.6]
-                candidatos_fin = [(idx, calcular_distancia_directa(punto_fin, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_fin, coord) < 0.6]
-                
-                mejor_a, mejor_b = -1, -1
-                costo_minimo = float('inf')
-                
-                for i, d_pie_inicio in candidatos_inicio:
-                    for j, d_pie_fin in candidatos_fin:
-                        distancia_nodos = (j - i) if i <= j else (len(coordenadas_ruta) - i + j)
-                        costo_calculado = d_pie_inicio + d_pie_fin + (distancia_nodos * 0.002)
-                        if costo_calculado < costo_minimo:
-                            costo_minimo = costo_calculado
-                            mejor_a, mejor_b = i, j
-                            
-                return mejor_a, mejor_b, calcular_distancia_directa(punto_inicio, coordenadas_ruta[mejor_a]), calcular_distancia_directa(punto_fin, coordenadas_ruta[mejor_b])
-                
-            idx_origen, idx_destino, dist_caminata_1, dist_caminata_2 = ubicar_paradas(coord_a, coord_b, ruta_fisica)
-            coord_parada_1, coord_parada_2 = ruta_fisica[idx_origen], ruta_fisica[idx_destino]
-            
-            _, _, geom_c1 = obtener_ruta_vehiculo(coord_a, coord_parada_1, perfil="peaton")
-            geom_caminata_1 = geom_c1 if geom_c1 else [coord_a, coord_parada_1]
-            dist_w1, tiempo_w1 = dist_caminata_1, dist_caminata_1 / self.velocidad_caminando
-            
-            if idx_origen <= idx_destino:
-                geom_micro = ruta_fisica[idx_origen : idx_destino + 1]
-            else:
-                geom_micro = ruta_fisica[idx_origen : ] + ruta_fisica[0 : idx_destino + 1]
-                
-            dist_micro = sum(calcular_distancia_directa(geom_micro[k], geom_micro[k+1]) for k in range(len(geom_micro)-1)) if len(geom_micro) > 1 else 0
-            tiempo_micro = (dist_micro * 1.3) / (20.0 / 60.0)
-            
-            _, _, geom_c2 = obtener_ruta_vehiculo(coord_parada_2, coord_b, perfil="peaton")
-            geom_caminata_2 = geom_c2 if geom_c2 else [coord_parada_2, coord_b]
-            dist_w2, tiempo_w2 = dist_caminata_2, dist_caminata_2 / self.velocidad_caminando
-            
-            precio_pasaje = info_ruta['costo_pasaje']
-            
-            tiempo_total_tramo = tiempo_w1 + tiempo_micro + tiempo_w2
-            distancia_total_tramo = dist_w1 + dist_micro + dist_w2
-            impresion_modo = f"Micro ({id_linea})"
-            
-            # El Operador Agrupado inserta 3 acciones físicas como 1 sola unidad matemática
-            segmentos.extend([
-                {'origen': nodo_a, 'destino': f'Parada({nodo_a[:3]})', 'modo': 'Pie', 'distancia': dist_w1, 'tiempo': tiempo_w1, 'geometria': geom_caminata_1, 'costo': 0.0},
-                {'origen': f'Parada({nodo_a[:3]})', 'destino': f'Parada({nodo_b[:3]})', 'modo': 'Micro', 'distancia': dist_micro, 'tiempo': tiempo_micro, 'geometria': geom_micro, 'costo': precio_pasaje},
-                {'origen': f'Parada({nodo_b[:3]})', 'destino': nodo_b, 'modo': 'Pie', 'distancia': dist_w2, 'tiempo': tiempo_w2, 'geometria': geom_caminata_2, 'costo': 0.0}
-            ])
-            
-    return segmentos, precio_pasaje, tiempo_total_tramo, distancia_total_tramo, impresion_modo
+url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
+respuesta = requests.get(url, headers={"User-Agent": "NocheMuseos/1.0"}, timeout=5)
+datos = respuesta.json()
 ```
 
-### 3.2. Implementación de Poda Algorítmica y Análisis de Complejidad Matemática
-El problema principal que hemos solucionado es una variación estricta del problema de encontrar la ruta más corta para un repartidor que debe visitar muchas ciudades sin repetir trayectos. Intentar resolverlo de manera bruta significa calcular las variaciones exponenciales factoriales de todos los lugares. 
-Matemáticamente, la lentitud temporal del algoritmo sin optimizar es factorial, es decir, de un crecimiento imposible. Con diez museos seleccionados, la máquina debería procesar más de tres millones de combinaciones gigantes. Con quince museos, superaríamos el billón. La computadora colapsaría antes de terminar.
+### Cómo calculamos todas las rutas de movimiento para autos y el peatón
+Cuando el usuario quiere ir del Museo A al Museo B en auto o caminando, el programa toma las coordenadas de ambos museos y hace una petición a OpenStreetMap pidiendo el "perfil peatón" o el "perfil auto". Si hay conexión, guardamos la lista de calles que nos da. Si la conexión falla, el programa une los dos puntos con una línea directa de emergencia usando el cálculo de distancia visto en el paso anterior.
 
-Nuestra Inteligencia Artificial implementa una táctica agresiva de "Corte de Ramas Inútiles" por encima del árbol matemático.
-Este corte evalúa matemáticamente en tiempo real si el acumulado histórico del `Presupuesto` de dinero o del `Tiempo` en un museo intermedio supera las restricciones indicadas por el usuario. Si lo hace, la Inteligencia Axiomáticamente concluye que investigar todo lo que sigue en adelante será inútil, destruyendo por completo todo ese futuro matemático sin procesarlo. Esto acelera un cálculo de años reales a unos formidables y eficientes **cero punto un segundos**.
+### Los modos de transporte, cómo los implementamos e instalamos
+En el simulador tenemos tres modos de transporte: Peatón, Auto/Taxi, y Micros/Trufis.
+- **Peatón y Auto:** Los implementamos usando el servidor de OpenStreetMap porque pueden ir desde cualquier puerta hasta cualquier otra puerta directamente.
+- **Micros/Trufis:** Es mucho más difícil porque los micros tienen líneas fijas y no te recogen en la puerta. Los implementamos leyendo un archivo lleno de rutas fijas y buscando cuál ruta pasa cerca del origen y del destino.
 
-El siguiente bloque de código detalla exactamente cómo la Inteligencia evalúa los topes máximos y cómo, utilizando la librería nativa de Matemática Factorial, contabiliza el abismal número de combinaciones que acaban de ser salvadas de la memoria por la destrucción inmediata (`return`) de la rama:
-
-```python
-def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
-    
-    # 1. Condición Axiomática de Poda Algorítmica
-    if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
-        m = len(museos_faltantes)
-        
-        # 2. Análisis de Complejidad Combinatoria (Ramas Cortadas Matemáticamente)
-        ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
-        self.contador_exploracion += ramas_cortadas
-        
-        texto_camino = [abreviar(x) for x in camino_actual] + [abreviar(m) for m in museos_faltantes] + ['Origen']
-        cabecera = f"\\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
-        
-        registro_final = [cabecera, "-" * 65] + list(lineas_registro)
-        registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
-        
-        # Emisión Gráfica del resultado de la Poda hacia la Consola del Usuario
-        self.progreso_senal.emit("\\n".join(registro_final))
-        
-        # 3. Terminación Inmediata de la Exploración (Destrucción de la Ramificación Futura)
-        return
-```
+### Rutas del transporte público y paradas, tramos y paradas (Cómo se instaló y de dónde lo conseguimos)
+Para conseguir las rutas de los micros y trufis de Cochabamba, descargamos la información libre de la ciudad en un archivo llamado `rutas_trufis.geojson`. Este archivo tiene dibujado por dónde pasa cada línea.
+Para incorporarlo al proyecto, hicimos una función que lee este archivo. Luego, para calcular las "Paradas", el sistema busca qué calles del recorrido del micro están a menos de 400 metros de distancia del museo. Así, se crea un tramo dividido en tres pasos: Caminar a la parada, viajar en el micro, y caminar de la parada al museo.
 
 ---
 
-## CAPÍTULO IV: TAXONOMÍA DE INTELIGENCIA ARTIFICIAL MULTIAGENTE
+## CAPÍTULO IV: CACHÉ, MACROOPERADORES Y BÚSQUEDA
 
-En el núcleo lógico, nuestro equipo justificó formalmente la separación de responsabilidades inspirada en la arquitectura literaria clásica documentada por los grandes autores del campo de la Inteligencia Artificial (Russell y Norvig). Dividimos el simulador separándolo en Cuatro Entidades Computacionales independientes ("Agentes"), todas las cuales han sido envueltas como procesos independientes de trabajo usando librerías de hilos paralelos del sistema operativo. A continuación, el código fuente completo que hace uso de este modelaje:
+### Cómo desarrollamos e implementamos el Caché para las rutas del peatón y en taxi
+Si pedimos miles de rutas a OpenStreetMap por internet, el programa sería muy lento y nos bloquearían. Para solucionarlo, desarrollamos un "Caché" (memoria guardada).
+Lo implementamos creando dos archivos de texto en la computadora (`cache_peatonal.json` y `cache_taxi.json`). Cuando el programa necesita una ruta, primero busca en estos archivos locales. Si la ruta ya está guardada, la saca de ahí y es instantáneo. Solo se conecta a internet si la ruta es completamente nueva, y una vez que la descarga, la guarda en los archivos para el futuro.
 
-### 4.1. Agente Reactivo Simple (El Agente Guía)
-**Fundamento Teórico:** Los Agentes Reactivos Simples carecen de memoria del mundo pasado. Seleccionan sus acciones de intervención basándose rigurosamente en un evento percibido en su presente inmediato, ejecutando la regla condicional fundamental "SI ESTO OCURRE, ENTONCES HAGO ESTO".
+### Instalación e Implementación de Macrooperadores
+Cuando una persona viaja en micro, hace varias cosas: Camina, sube al micro, viaja, y camina al museo. Si el programa calculara esto como cosas separadas, se confundiría. 
+Implementamos un **Macrooperador**, que es una función de código que agrupa estas tres acciones separadas y las convierte en "Un solo gran movimiento matemático" con un costo total y un tiempo total fijo. 
 
-En nuestro código, el Agente Guía percibe el evento de que un visitante llegó a la puerta del Edificio. Su reacción inmediata programada es descontar el dinero del costo de Entrada, y paralelamente encender un manipulador de reloj para cobrar los minutos de la visita teórica. No sabe qué museo sigue después, ni le importa de dónde vino el turista.
+### Cómo creamos el caché para optimizar las operaciones de macrooperadores
+Como el Macrooperador de micro necesita saber cómo caminar a las paradas, usa nuestra función de memoria (Caché peatonal) que explicamos arriba. Al tener las caminatas a las paradas ya guardadas en el disco duro, el Macrooperador se arma de manera inmediata sin perder tiempo conectándose a internet, haciendo que armar el viaje en micro sea ultra rápido.
 
-```python
-class ControladorTurista(QThread):
-    senal_reloj = pyqtSignal(float)
-    senal_salida = pyqtSignal()
-    def __init__(self, minutos_reales, multiplicador_velocidad):
-        super().__init__()
-        self.minutos_reales = minutos_reales
-        self.multiplicador = multiplicador_velocidad
-        self.cuadros_por_segundo = 10
-    def run(self):
-        segundos_animacion = (self.minutos_reales * 60) / self.multiplicador
-        cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
-        minutos_reloj_simulado = self.minutos_reales / cantidad_frames
-        for frame in range(cantidad_frames):
-            self.senal_reloj.emit(minutos_reloj_simulado)
-            time.sleep(1.0 / self.cuadros_por_segundo)
-        self.senal_salida.emit()
+### Instalación e Implementación de Motores de Búsqueda
+Para encontrar el mejor recorrido visitando muchos museos, implementamos un Motor de Búsqueda de Inteligencia Artificial llamado **Búsqueda en Profundidad**. 
+Este motor funciona explorando una opción de camino hasta el final (Ej. Museo A -> B -> C). Si ese camino no es bueno, retrocede un paso y prueba otra combinación (A -> B -> D). Así revisa las combinaciones hasta encontrar la mejor.
 
-class AgenteGuia:
-    def __init__(self, ui_principal, funcion_reloj, funcion_plata, minutos_visita):
-        self.interfaz = ui_principal
-        self.restar_reloj = funcion_reloj 
-        self.restar_plata = funcion_plata
-        self.minutos_visita = minutos_visita
-        self.animacion = None
+### Instalación e Implementación de Poda
+Revisar todas las combinaciones posibles es muy lento. Si elegimos muchos museos, la computadora podría tardar años. Para evitar esto, implementamos la **Poda**. 
+La poda es un código que revisa en todo momento si el dinero o el tiempo gastado hasta ahora ya es mayor al que tiene el usuario. Si ya nos pasamos del límite de tiempo, la Poda corta inmediatamente ese camino y la computadora ya no sigue revisando los museos que faltaban en ese recorrido, ahorrando millones de operaciones.
 
-    def aterrizaje(self, nombre_edificio, funcion_continuar):
-        if nombre_edificio == 'Origen':
-            mensaje = QMessageBox(self.interfaz)
-            mensaje.setWindowTitle("Fin")
-            mensaje.setText("¡Llegaste a casa!")
-            mensaje.setIcon(QMessageBox.Information)
-            mensaje.addButton("Aceptar", QMessageBox.AcceptRole)
-            mensaje.exec_()
-            self.interfaz.consola_registros.append("[Guía] Fin del tour.")
-            self.interfaz.boton_calcular.setEnabled(True)
-            funcion_continuar()
-            return
-
-        precio_boleto = ENTRADAS.get(nombre_edificio, 0)
-        mensaje = QMessageBox(self.interfaz)
-        mensaje.setWindowTitle("Museo")
-        mensaje.setText(f"Visitar {nombre_edificio}?")
-        mensaje.setIcon(QMessageBox.Question)
-        mensaje.addButton("Entrar", QMessageBox.AcceptRole)
-        mensaje.exec_()
-        
-        # Ejecución de Condición Reactiva Simple Inmediata
-        if precio_boleto > 0:
-            self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
-            
-        self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
-        multiplicador_aceleracion = int(self.interfaz.combo_acelerador.currentText().replace("x", ""))
-        self.animacion = ControladorTurista(self.minutos_visita, multiplicador_aceleracion)
-        self.animacion.senal_reloj.connect(self.interfaz.restar_minutos)
-        
-        def al_salir():
-            self.interfaz.consola_registros.append(f"[Guía] Saliendo de {nombre_edificio}.")
-            nombre_limpio = nombre_edificio.replace("'", "\\'")
-            self.interfaz.visor_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_limpio}', 'green');")
-            funcion_continuar()
-            
-        self.animacion.senal_salida.connect(al_salir)
-        self.animacion.start()
-```
-
-### 4.2. Agente Reactivo Basado en Modelos (El Animador Físico)
-**Fundamento Teórico:** Un Agente Basado en Modelos del Mundo supera la ceguera de un agente simple, porque este agente implementa una memoria interna de cómo funciona físicamente el mundo externo.
-
-El mundo en nuestro simulador es una ciudad dibujada sobre un mapa. Nuestro agente "modela matemáticamente" a qué velocidad se desplaza la figura en pantalla, calcula el avance vectorial de los puntos ciegos entre cada cruce de la avenida, y dibuja de forma predictiva a futuro la imagen en la pantalla para simular la continuidad de la materia en el espacio.
-
-```python
-class AnimadorMovimiento(QThread):
-    senal_coordenada = pyqtSignal(float, float, str)
-    senal_reloj = pyqtSignal(float)
-    senal_llegada = pyqtSignal(str)
-
-    def __init__(self, lista_geometrias, kmh_auto, kmh_pie, multiplicador_velocidad):
-        super().__init__()
-        self.trazos = lista_geometrias
-        self.velocidad_metros_auto = (kmh_auto * 1000) / 3600.0
-        self.velocidad_metros_pie = (kmh_pie * 1000) / 3600.0
-        self.multiplicador = multiplicador_velocidad
-        self.activo = True
-        self.cuadros_por_segundo = 30
-        
-    def run(self):
-        for segmento in self.trazos:
-            if not self.activo: break
-            puntos_gps = segmento['geometria']
-            tipo_movimiento = segmento['modo']
-            destino_nombre = segmento['destino']
-            
-            # Evaluación Constante de Reglas del Mundo Real
-            if tipo_movimiento == 'Micro':
-                metros_por_segundo = (20.0 * 1000) / 3600.0
-            else:
-                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
-                
-            for indice in range(len(puntos_gps) - 1):
-                if not self.activo: break
-                punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
-                metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
-                if metros_distancia == 0: continue
-                
-                # Proyección Matemática del Movimiento Continuo
-                segundos_reales = metros_distancia / metros_por_segundo
-                segundos_animacion = segundos_reales / self.multiplicador
-                cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
-                salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
-                salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
-                minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
-                
-                for frame in range(cantidad_frames):
-                    if not self.activo: break
-                    latitud_dibujada = punto_a[0] + salto_latitud * frame
-                    longitud_dibujada = punto_a[1] + salto_longitud * frame
-                    
-                    # Reflejo del modelo interno en el mundo visible
-                    self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
-                    self.senal_reloj.emit(minutos_reloj_simulado)
-                    time.sleep(1.0 / self.cuadros_por_segundo)
-                    
-            if self.activo:
-                self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
-                self.senal_llegada.emit(destino_nombre)
-                self.activo = False 
-```
-
-### 4.3. Agente Basado en Objetivos (El Coordinador de Transporte)
-**Fundamento Teórico:** El Agente Basado en Objetivos de Metas cuenta con un conocimiento global de lo que se desea lograr a futuro. A diferencia del Agente Simple, no actúa sin sentido avanzando cuadra por cuadra; en cambio, es capaz de encadenar una extensa lista de pasos y orquestarlos uno detrás de otro de manera secuencial hasta asegurarse de que el camino de la computadora llegue hasta el fin supremo.
-
-En nuestro algoritmo, este Agente posee en su interior la "Ruta de la Victoria", y se responsabiliza de actuar como un director de orquesta, pasándole órdenes al Animador Físico y retomando el control cada vez que un tramo termina.
-
-```python
-class AgenteTransporte:
-    def __init__(self, consola_ui, web_ui, funcion_dinero, funcion_tiempo):
-        self.consola = consola_ui
-        self.visor_mapa = web_ui
-        self.restar_plata = funcion_dinero
-        self.restar_reloj = funcion_tiempo
-        self.ruta_actual = None
-        self.indice_tramo = 0
-        self.animacion = None
-        
-    def imprimir(self, texto):
-        self.consola.append(f"[Vehículo] {texto}")
-        
-    def arrancar_motor(self, datos_ruta, velocidad_coche, velocidad_caminando, acelerador, funcion_llegada):
-        if self.animacion and self.animacion.isRunning():
-            self.animacion.activo = False
-            self.animacion.wait()
-        self.ruta_actual = datos_ruta
-        self.indice_tramo = 0
-        self.evento_llegada = funcion_llegada
-        self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
-        self.imprimir(f"Iniciando trayecto en aceleración x{acelerador}")
-        self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
-        
-    def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
-        # Supervisión Incesante del Cumplimiento de la Meta
-        if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
-            segmento = self.ruta_actual['geometrias'][self.indice_tramo]
-            self.imprimir(f"Avanzando a {segmento['destino']} por {segmento['modo']}")
-            
-            costo_monetario = segmento.get('costo', 0)
-            if costo_monetario > 0:
-                self.restar_plata(costo_monetario, f"boleto de {segmento['modo']}")
-                
-            color_pintura = "red"
-            if segmento['modo'] == 'Micro': color_pintura = "purple"
-            
-            es_punteada = "true" if segmento['modo'] == 'Pie' else "false"
-            self.visor_mapa.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_pintura}', {es_punteada});")
-            
-            self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
-            self.animacion.senal_coordenada.connect(self.refrescar_pantalla)
-            self.animacion.senal_reloj.connect(self.restar_reloj)
-            self.animacion.senal_llegada.connect(self.aterrizaje)
-            self.animacion.start()
-            self.velocidad_coche = velocidad_coche
-            self.velocidad_caminando = velocidad_caminando
-            self.acelerador = acelerador
-        else:
-            self.imprimir("Meta suprema y absoluta lograda con éxito.")
-
-    def refrescar_pantalla(self, latitud, longitud, transporte):
-        color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
-        self.visor_mapa.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({latitud}, {longitud}, '{color_icono}');")
-
-    def aterrizaje(self, nombre_destino):
-        self.imprimir(f"Vehículo inmovilizado en la puerta de {nombre_destino}.")
-        self.indice_tramo += 1
-        # Llamada cíclica y encadenada garantizando la continuación
-        self.evento_llegada(nombre_destino, lambda: self.siguiente_movimiento(self.velocidad_coche, self.velocidad_caminando, self.acelerador))
-```
-
-### 4.4. Agente Basado en Función de Utilidad (El Buscador Matemático Supremo)
-**Fundamento Teórico:** Un Agente Basado en Utilidad o Felicidad es el nivel jerárquico más avanzado de esta taxonomía de la Información. Entiende perfectamente que una misma meta se puede alcanzar de miles de maneras combinadas, pero reconoce matemáticamente que algunas victorias son más "beneficiosas" que otras. El agente otorga puntos de felicidad numérica a cada camino y escoge estadísticamente al mayor ganador.
-
-Como describimos de forma extensa en la sección sobre Complejidad Matemática y Cortado de Árboles Inútiles (Capítulo 3), este Agente devora las limitantes del sistema (Presupuesto y Tiempo en Reloj), viaja por todo el espectro combinatorio inmenso, y le otorga a la ruta más abarcadora el Premio de Máxima Felicidad.
-
-```python
-class AgenteBuscador(QThread):
-    progreso_senal = pyqtSignal(str)
-    finalizado_senal = pyqtSignal(list)
-    error_senal = pyqtSignal(str)
-    
-    def __init__(self, origen, museos, presupuesto, tiempo, vel_auto, vel_pie, tiempo_museo, permitir_pie=True, permitir_taxi=True, permitir_micro=True):
-        super().__init__()
-        self.coordenada_origen = origen
-        self.lista_museos = museos
-        self.presupuesto_maximo = presupuesto
-        self.tiempo_maximo = tiempo
-        self.velocidad_coche = vel_auto / 60.0
-        self.velocidad_caminando = vel_pie / 60.0
-        self.duracion_visita = tiempo_museo
-        self.costo_coche = 5.0
-        self.permitir_pie = permitir_pie
-        self.permitir_taxi = permitir_taxi
-        self.permitir_micro = permitir_micro
-
-    def run(self):
-        try:
-            coordenadas = {'Origen': self.coordenada_origen}
-            for museo in self.lista_museos: coordenadas[museo] = MUSEOS[museo]
-
-            rutas_encontradas = []
-            cantidad_museos = len(self.lista_museos)
-            total_combinaciones = sum(math.factorial(cantidad_museos) // math.factorial(cantidad_museos - k) for k in range(1, cantidad_museos + 1))
-            self.contador_exploracion = 0
-
-            def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
-                # Evaluación Rigurosa de Restricciones Monetarias y Temporales
-                if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
-                    return
-
-                if not museos_faltantes:
-                    return
-
-                for siguiente_museo in museos_faltantes:
-                    # Análisis Comparativo y Otorgamiento de Puntuación
-                    pass
-
-            if self.permitir_pie: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Pie')
-            if self.permitir_taxi: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Auto')
-            if self.permitir_micro: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Micro')
-                
-            if rutas_encontradas:
-                # Proceso de Subyugación Excluyente para Extraer la Opción de Mayor Beneficio 
-                max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
-                rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
-                self.finalizado_senal.emit(rutas_validas)
-            else:
-                self.finalizado_senal.emit([])
-        except Exception as error_capturado:
-            self.error_senal.emit(str(error_capturado))
-```
+### Instalación e Implementación de Filtrado y Despliegue de Resultados
+Después de hacer la Búsqueda y la Poda, pueden quedar varios caminos válidos. Para mostrar el mejor, implementamos un algoritmo de Filtrado. 
+El filtrado cuenta cuántos museos logró visitar cada camino válido. Luego descarta los caminos más pobres y se queda únicamente con la ruta que logró visitar la mayor cantidad de museos. Ese resultado ganador es el que se dibuja en la pantalla y en el mapa.
 
 ---
 
-## CAPÍTULO V: ALGORITMOS DE MEMORIA INTERNA Y FILTRADO INMEDIATO
+## CAPÍTULO V: ARQUITECTURA MULTIAGENTE Y TAXONOMÍA
 
-### 5.1. Implementación de Almacenamiento Temprano y Principio de Compensación de Recursos Computacionales
-En la ciencia académica de las computadoras, el Principio de Compensación de Espacio y Tiempo dictamina que una solución puede ejecutarse mucho más rápido (ganar Tiempo valioso) si consumimos deliberadamente y en gran medida la Memoria de la Máquina (sacrificar el Espacio de guardado).
-Una de nuestras Entidades necesita trazar millones de combinaciones matemáticas. Solicitar y descargar datos desde una nube en Alemania millones de veces destruiría nuestra capacidad de red y los servidores foráneos bloquearían nuestro acceso tildándonos de Ataque de Denegación de Servicio cibernético.
+En Inteligencia Artificial, un "Agente" es un pequeño programa independiente que percibe cosas y toma decisiones. Implementamos 4 tipos diferentes de agentes que trabajan juntos (Arquitectura Multiagente). Se instalaron usando "Hilos" de programación para que trabajen en paralelo.
 
-Para apaciguar y esquivar este cuello de botella catastrófico, el equipo fabricó una **Memoria de Acceso Rápido Secundaria en Disco Local** compuesta de archivos estructurados de texto. El funcionamiento lógico interno, también llamado "Estrategia de Memoria de Golpes y Fallos" opera así: 
-1. Nuestra función calcula matemáticamente un Sello de Autenticidad concatenando y fusionando las coordenadas del principio y el fin de la calle.
-2. Interroga al disco duro local: ¿Conoces el vector físico y la medida exacta de esta calle?
-3. **Golpe Exitoso de Memoria:** Si el archivo local certifica que existe, extraemos en fracciones ridículas de milisegundo toda la información necesaria.
-4. **Fallo Crítico de Memoria:** Si el localizador responde negativo, se aprueba encender la comunicación con la antena de internet externa incurriendo en graves pérdidas de tiempo. Sin embargo, al lograr obtener la información foránea, el sistema lo incrusta silenciosa e inmediatamente en los archivos guardados, de manera que el sistema "Aprende" para que al volver a preguntar en un futuro, el cálculo sea inmediato.
+### 1. Agentes Reactivos Simples (El Agente Guía)
+Este tipo de agente solo reacciona a lo que pasa en el momento sin pensar en el futuro ni en el pasado. Su regla es "Si pasa esto, hago esto".
+**Cómo funciona en nuestro proyecto:** Es el agente que te recibe en la puerta del museo. Cuando nota que el auto llegó a un museo, su única reacción es cobrar el dinero de la entrada y hacer pasar el tiempo de la visita en el reloj.
 
-```python
-ARCHIVO_PEATONAL = "cache_peatonal.json"
-ARCHIVO_TAXI = "cache_taxi.json"
+### 2. Agentes Reactivos Basados en Modelos (El Agente de Movimiento)
+Este agente es más avanzado porque entiende cómo funcionan las reglas físicas del mundo interior.
+**Cómo funciona en nuestro proyecto:** Es el encargado de mover el marcador del auto en el mapa. Sabe a qué velocidad va el auto, sabe cuánta distancia hay y calcula en qué coordenada del mapa debería dibujarse el auto cada segundo para simular movimiento continuo.
 
-memoria_peaton = {}
-memoria_taxi = {}
+### 3. Agentes Basados en Objetivos (El Agente de Transporte)
+Este agente tiene una meta clara y planifica varios pasos por adelantado para cumplirla, sin importar si los pasos cambian.
+**Cómo funciona en nuestro proyecto:** Es el agente que tiene toda la ruta ganadora. Sabe que tiene que ir por varios museos. Le da órdenes al Agente de Movimiento para avanzar al primer museo, espera a que termine, y luego sigue con el siguiente museo hasta cumplir la ruta completa.
 
-# Interrogación Inmediata de Memoria Permanente Flash en Disco
-if os.path.exists(ARCHIVO_PEATONAL):
-    try:
-        with open(ARCHIVO_PEATONAL, "r", encoding="utf-8") as archivo:
-            memoria_peaton = json.load(archivo)
-    except Exception:
-        pass
-
-def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
-    # Generación Estricta de Sello de Autenticidad Computacional
-    llave = f"{perfil}|{origen[0]},{origen[1]}|{destino[0]},{destino[1]}"
-    memoria_activa = memoria_peaton if perfil == 'peaton' else memoria_taxi
-    
-    # ÉXITO ROTUNDO: Evade el colapso del conducto de internet
-    if llave in memoria_activa:
-        datos = memoria_activa[llave]
-        return datos[0], datos[1], datos[2]
-        
-    longitud_1, latitud_1 = origen[1], origen[0]
-    longitud_2, latitud_2 = destino[1], destino[0]
-    
-    url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-    
-    # FRACASO INTERNO: Llamada externa rigurosa al servidor mundial
-    try:
-        import time
-        time.sleep(0.3)
-        headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
-        respuesta = requests.get(url, headers=headers, timeout=5)
-        datos = respuesta.json()
-        if datos.get('code') == 'Ok':
-            ruta_obtenida = datos['routes'][0]
-            distancia_kilos = ruta_obtenida['distance'] / 1000.0
-            tiempo_minutos = ruta_obtenida['duration'] / 60.0
-            # Descompresión del algoritmo encriptador de cadenas geográficas
-            puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
-            
-            # Principio de Compensación Fuerte: Guardar consumiendo disco duro masivamente
-            memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
-            guardar_memoria(perfil)
-            return distancia_kilos, tiempo_minutos, puntos_ruta
-    except Exception:
-        pass
-        
-    memoria_activa[llave] = [None, None, None]
-    guardar_memoria(perfil)
-    return None, None, None
-```
-
-### 5.2. Descarte por Utilidad Deficiente
-Una vez que la red infinita ha sido finalizada y únicamente sobreviven aquellos pocos candidatos que cumplieron de inicio a fin con no pasarse ni en Dinero ni en Tiempo, poseemos un conglomerado en bruto.
-Aquí ingresa la función final de pureza matemática, un código diseñado explícitamente para contar los museos obtenidos por trayecto, comparar números enteros y descartar cualquier opción que presente deficiencias en utilidad global.
+### 4. Agentes Basados en Utilidad (El Agente Buscador Supremo)
+Este es el agente más inteligente. Sabe que hay muchas formas de lograr la meta, pero busca la que dé mayor felicidad o puntaje útil.
+**Cómo funciona en nuestro proyecto:** Es el que ejecuta el Motor de Búsqueda y la Poda. Revisa todos los caminos posibles y le da más "puntaje" a la ruta que visita más museos gastando menos tiempo y dinero.
 
 ---
 
-## CAPÍTULO VI: MANUAL OPERATIVO Y GUÍA DE USUARIO (MÓDULO VISUAL)
+## CAPÍTULO VI: MANUAL OPERATIVO COMPLETO PARA EL USUARIO DEL SIMULADOR
 
-La interfaz se concibió aislando las capas lógicas tras los fundamentos del diseño "Modelo, Vista y Controlador". Todo ha sido estructurado en una sucesión lógica restrictiva:
+Para utilizar el software "Noche de Museos Cochabamba", siga estos pasos:
 
-### 6.1. Panel Lógico y Restricciones
-1. El ciudadano que maniobra la aplicación debe teclear sus restricciones socioeconómicas en la columna izquierda: Digitando cuántos Bolívares o pesos tiene el viajante y marcando su límite máximo horario expresado matemáticamente en minutos.
-2. Inmediatamente debajo ajusta las Leyes Físicas Cinemáticas: Seleccionando la constante teórica de kilómetros por hora tanto a nivel caminata como transporte veloz. Asimismo, regulará el multiplicador general temporal, logrando que sesenta minutos reales sean acelerados en diez segundos computacionales en la pantalla.
-
-### 6.2. Matriz Cartográfica Seleccionable 
-Las veintitrés casillas visuales inyectan sus decisiones directamente hacia los conjuntos matemáticos inmutables de memoria temporal descritos previamente, forzando y modelando la voluntad del explorador interno de buscar conexiones geográficas.
-
-### 6.3. Ignición General
-Cuando se presiona el interruptor rotulado como "Calcular", las funciones suspenden preventivamente todo acceso táctil a la Interfaz, protegiéndola contra corrupciones de hilos simultáneos, enviando el mando completo a las profundidades de la Inteligencia Artificial.
-El humano operador tiene la obligación de monitorizar la Ventana Oscura Inferior donde la Máquina escupirá informes logísticos informando cuántas líneas de probabilidad han sido sesgadas e incineradas exitosamente gracias a la matemática.
-
-### 6.4. Observatorio Interactivo Multimodal
-Si existen caminos triunfantes, el usuario oprime el botón final "Iniciar". De este modo, los tres cerebros artificiales remanentes asumen el control inyectando instrucciones de manipulación desde Python hacia el documento hipertexto interno de Google que renderiza las capas satelitales urbanas. La marioneta abstracta virtual (punto de anclaje) bailará milimétricamente obedeciendo el dictado numérico, disminuyendo las arcas del banco visual en vivo con rigurosa precisión.
-
----
-
-## CONCLUSIONES GENERALES DE INGENIERÍA 
-Implementar Entidades de Inteligencia Computacional dentro de un marco simulador urbano y masivo exige irrenunciablemente construir andamiajes de Subprocesos Autónomos Simultáneos sumados a cálculos abismales regidos por la Complejidad Matemática Teórica de Crecimiento Infinito. Con este trabajo se ha comprobado concluyentemente que el modelo multi-entidad expuesto en la literatura universitaria superior, cuando es amalgamado quirúrgicamente con un método brutal y sistemático de Cortado Temprano Exponencial, produce resultados donde la optimización derrota de modo aplastante al estallido numérico de la física natural.
-Se procesan en apenas escasos milisegundos una avalancha de posibilidades matemáticas que habitualmente requeriría días enteros en resolverse, dejando abierta la viabilidad plena de su trasplante a ecosistemas colosales a escala internacional de navegación aérea y despachos portuarios, asegurando que la asincronía de su construcción garantiza el triunfo continuo contra la lentitud tradicional del procesamiento lógico informático estándar.
+1. **Definir el Origen y Recursos:** En la parte izquierda de la pantalla, ingrese el Presupuesto (en dinero) y el Tiempo libre (en minutos) que tiene para todo el recorrido de la noche.
+2. **Definir las Velocidades:** En la misma columna, escriba a qué velocidad caminará y a qué velocidad viaja en auto. Elija también un "Acelerador" (Ej. x10) para que la animación del auto en el mapa sea rápida y no tenga que esperar tiempo real.
+3. **Seleccionar los Museos:** Marque con un visto bueno las casillas de los museos que le gustaría visitar. Puede seleccionar desde 2 hasta más de 10 museos.
+4. **Calcular la Ruta:** Presione el botón azul "Calcular". El sistema mostrará en la caja de texto negra debajo cómo el algoritmo va "Podando" las rutas que son muy caras o tardan mucho.
+5. **Iniciar el Recorrido Visual:** Si la computadora encuentra una ruta exitosa, el botón verde "Iniciar" se habilitará. Presiónelo para ver cómo el marcador se mueve por las calles de Cochabamba en el mapa interactivo de la derecha, visitando cada museo paso a paso.
+6. **Ver el Resultado:** Podrá ver las líneas rojas (viaje en auto), líneas punteadas (caminata) o líneas moradas (viaje en micro) dibujadas en el mapa, mientras los indicadores de arriba le muestran el dinero y tiempo restante.
