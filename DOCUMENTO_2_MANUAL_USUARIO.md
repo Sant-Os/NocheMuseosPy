@@ -26,6 +26,9 @@ No programamos todo desde cero. Usamos "Bibliotecas", que son paquetes de códig
 - `requests`: Nos permite conectar el programa a internet para pedir rutas a servidores mundiales.
 - `polyline`: Es una herramienta matemática que descomprime la información de la ruta que nos manda internet.
 - `folium` y `geopy`: Herramientas cartográficas. Nos permiten dibujar los marcadores rojos de los museos y encontrar la latitud y longitud.
+```bash
+pip install PyQt5 PyQtWebEngine folium requests polyline geopy
+```
 
 **2. Bibliotecas Nativas (Ya vienen dentro de Python, solo hay que usarlas):**
 - `math`: La usamos para fórmulas de distancia, trigonometría y divisiones matemáticas.
@@ -140,6 +143,23 @@ caja_botones.addWidget(self.boton_reiniciar)
 El mapa que ves a la derecha del programa no es una imagen estática. Lo construimos usando la herramienta `folium`, la cual genera un código en HTML y lo dibuja en nuestra ventana mediante el navegador interno de PyQt.
 Para hacer que el "marcador" del autito se mueva por la calle sin tener que recargar el mapa (lo que daría parpadeos molestos), inyectamos un pequeño código de **JavaScript** dentro de Python. Este código empuja las coordenadas de la calle en vivo para que el autito ruede con una animación suave.
 
+```python
+# Inyección de JavaScript en Python (ui_ventana.py)
+js_movimiento = """
+<script>
+    window.updateMovingMarker = function(lat, lon, color) {
+        var latlng = [lat, lon];
+        if (movingMarker) {
+            movingMarker.setLatLng(latlng);
+        } else {
+            movingMarker = L.marker(latlng).addTo(mapInstance);
+        }
+    };
+</script>
+"""
+mapa_folium.get_root().html.add_child(folium.Element(js_movimiento))
+```
+
 ---
 
 ## CAPÍTULO III: MATEMÁTICAS, MAPAS Y TRANSPORTE
@@ -191,14 +211,45 @@ def calcular_distancia_directa(origen, destino):
 Una vez que nuestra fórmula matemática nos devuelve la distancia real, saber el tiempo es muy simple: usamos la ley física que dice que el Tiempo es igual a la Distancia dividida por la Velocidad (`t = d / v`).
 En nuestro simulador, el usuario puede seleccionar a qué velocidad caminará y a qué velocidad viajará el auto. El programa simplemente divide la distancia obtenida de OpenStreetMap entre la velocidad que seleccionó el usuario para saber con exactitud cuántos minutos durará el viaje de una calle a otra.
 
+```python
+# Extracto del código lógico de física de movimiento (agentes_ia.py)
+velocidad_actual = self.velocidad_auto if modo == 'Auto' else self.velocidad_pie
+
+# Tiempo = (Distancia / Velocidad) * 60 minutos
+tiempo_horas = distancia_kilos / velocidad_actual
+tiempo_minutos = tiempo_horas * 60
+```
+
 ### Cómo calculamos todas las rutas de movimiento para autos y el peatón
 Cuando el usuario intenta ir del Museo A al Museo B en auto o caminando, el programa manda una alerta al servidor de OpenStreetMap solicitando el perfil de viaje. Si elegimos peatón, el servidor nos devuelve calles peatonales y parques. Si elegimos auto, nos devuelve calles para vehículos. Si la computadora no tiene internet en ese momento, el programa implementa un "plan de emergencia", dibujando una línea recta de pájaro y multiplicando la distancia por un pequeño margen de error para que la simulación no se detenga.
+
+```python
+# Plan de Emergencia si falla OpenStreetMap (configuracion.py)
+except Exception as e:
+    # Si falla la red, forzamos una línea recta directa con un 30% extra de penalización por curvas
+    distancia_kilos = calcular_distancia_directa(origen, destino) * 1.3
+    tiempo_minutos = (distancia_kilos / 20.0) * 60
+    puntos_ruta = [origen, destino]
+    
+    return distancia_kilos, tiempo_minutos, puntos_ruta
+```
 
 ### Los modos de transporte, cómo los implementamos e instalamos
 El simulador incorpora tres modos principales:
 1. **Peatonal:** Implementado para poder ir caminando por las aceras de cualquier parte.
 2. **Auto / Taxi:** Implementado para pedir un taxi libre que nos lleve de puerta a puerta usando el presupuesto en Bolívianos.
 3. **Transporte Público (Micro y Trufi):** Este es diferente, porque los micros no se salen de su ruta. Lo implementamos leyendo las rutas físicas reales de Cochabamba para que el usuario pueda tomar micros en los cruces.
+
+```python
+# Interfaz de Modos de Transporte (ui_ventana.py)
+self.check_pie = QCheckBox("Pie")
+self.check_taxi = QCheckBox("Taxi")
+self.check_micro = QCheckBox("Micro")
+
+# El usuario decide qué algoritmos instalar en la memoria
+permitir_pie = self.check_pie.isChecked()
+permitir_taxi = self.check_taxi.isChecked()
+```
 
 ### Rutas del transporte público y paradas (Cómo se instaló y de dónde lo conseguimos)
 Para los Micros, conseguimos un archivo de datos libres llamado `rutas_trufis.geojson` que contiene dibujadas todas las rutas del transporte público de Cochabamba.
@@ -228,6 +279,21 @@ for nombre_nodo, coordenada_nodo in nodos_ciudad.items():
 Para hallar el mejor recorrido de la "Noche de Museos", usamos Inteligencia Artificial creando un Motor de Búsqueda de **Profundidad**.
 Funciona explorando un camino por completo hasta el final (por ejemplo: Origen -> Museo A -> Museo B -> Origen). Si se da cuenta que sobró mucho dinero, la inteligencia "retrocede un paso" y se va por otra rama diferente probando (Museo A -> Museo C -> Museo B). De esta forma explora todas las posibilidades sin perderse.
 
+```python
+# Búsqueda en Profundidad Recursiva (agentes_ia.py)
+for i, museo_destino in enumerate(museos_faltantes):
+    # Generamos los cálculos para el museo escogido
+    # ...
+    
+    # LA RECURSIÓN: El Motor se llama a sí mismo para avanzar al siguiente nivel de profundidad
+    explorar_opciones(
+        camino_actual + [{'destino': museo_destino}],
+        museos_faltantes[:i] + museos_faltantes[i+1:], 
+        nuevo_gasto, 
+        nuevo_reloj
+    )
+```
+
 ### Instalación e Implementación de Poda
 Si el usuario selecciona 10 museos, hay millones de combinaciones para recorrerlos. Sería imposible calcularlos todos a tiempo.
 Por eso implementamos la **Poda**. La Poda es una regla en el código que evalúa constantemente el viaje. Si a mitad del recorrido el costo ya es más de 100 Bolivianos, y el usuario solo tiene 50, la Poda "corta" de inmediato ese camino y aborta su revisión futura. Esto evita que la computadora pierda tiempo analizando un camino que ya de por sí no es válido.
@@ -250,6 +316,19 @@ def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_ac
 ### Instalación e Implementación de Filtrado y Despliegue de Resultados
 Después de hacer la Búsqueda y la Poda, sobreviven varias rutas que sí alcanzan en el presupuesto de dinero y de tiempo.
 El programa las pasa por un Filtro Final. El Filtro Final cuenta cuántos museos visitó cada una de estas opciones ganadoras y elimina las más cortas. Como resultado final, solo despliega en la lista de la pantalla las opciones que visitaron la cantidad máxima absoluta de recintos culturales posibles con el dinero que tenías.
+
+```python
+# Filtrado de resultados finales (agentes_ia.py)
+if rutas_validas:
+    # 1. Encontrar el récord máximo de museos visitados
+    max_museos = max(ruta['cantidad_museos'] for ruta in rutas_validas)
+    
+    # 2. Filtrar y eliminar cualquier ruta que no haya llegado a ese récord
+    mejores_rutas = [ruta for ruta in rutas_validas if ruta['cantidad_museos'] == max_museos]
+    
+    # 3. Emitimos solo a los campeones
+    self.finalizado_senal.emit(mejores_rutas)
+```
 
 ### Cómo desarrollamos e implementamos el Caché para las rutas del peatón y en taxi
 Si en cada milímetro que explora el Motor de Búsqueda nos conectáramos a OpenStreetMap, demoraríamos años y nos bloquearían el internet.
@@ -306,6 +385,25 @@ En Ciencias de la Computación, un Agente Inteligente es un pequeño bloque de c
 2. **Agentes Reactivos Basados en Modelos (El Agente Animador Físico):** Es un robot que entiende cómo funciona la física y el movimiento en el mundo real. En el simulador, se encarga de recibir las coordenadas del GPS y dibujar cuadro por cuadro al auto deslizándose por la carretera respetando las leyes de velocidad y tiempo.
 3. **Agentes Basados en Objetivos (El Agente de Transporte):** Este robot tiene una meta clara y es capaz de coordinar los pasos para lograrla. Es el agente que dirige al animador físico y le dice qué calles tomar y cuándo detenerse, asegurándose de que la ruta final se cumpla museo tras museo sin desvíos.
 4. **Agentes Basados en Utilidad (El Agente Buscador Supremo):** El más inteligente de todos. No solo sabe llegar a la meta, sino que escoge el camino que dé más beneficio o "Utilidad". Este agente es el encargado de correr el motor de búsqueda, aplicar la poda matemática, comparar las rutas válidas y decidir cuál es la ruta que ahorra más tiempo y da mayor cantidad de museos.
+
+```python
+# Estructura de Clases para los 4 Agentes Multiagente
+class AgenteBuscador(QThread):
+    # Agente de Utilidad (Búsqueda A* y Poda)
+    pass
+
+class AgenteTransporte(QObject):
+    # Agente de Objetivos (Sigue la ruta designada)
+    pass
+
+class AgenteGuia:
+    # Agente Reactivo (Cobra entradas y hace esperar en el museo)
+    pass
+    
+class AnimadorMovimiento(QThread):
+    # Agente Basado en Modelos Físicos (Mueve el marcador según el GPS)
+    pass
+```
 
 ### Comunicación entre Agentes y la Interfaz Gráfica
 ¿Cómo puede el Agente seguir buscando rutas pesadas durante un minuto sin que la ventana de la computadora "se cuelgue"? 
