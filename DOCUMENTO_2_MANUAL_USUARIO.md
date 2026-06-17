@@ -159,13 +159,11 @@ class VentanaPrincipal(QMainWindow):
 ### 6. Arquitectura Multiagente y Taxonomía
 El ecosistema completo del simulador funciona gracias a la Inteligencia Artificial distribuida a través de "Agentes". En términos algorítmicos computacionales, un agente inteligente es una pequeña entidad programática independiente que es capaz de percibir su entorno, deliberar y ejecutar acciones buscando cumplir un objetivo sin requerir supervisión del núcleo. Hemos diseñado e implementado 4 jerarquías de la taxonomía de agentes (basado en Russell y Norvig):
 
-1. **Agentes Reactivos Simples (`AgenteGuia`):** Su arquitectura no contempla memoria histórica. Opera puramente mediante un conjunto de reglas Condición-Acción evaluando los cobros de boletos en la puerta de los museos.
-2. **Agentes Reactivos Basados en Modelos (`AnimadorMovimiento`):** Contiene una representación interna del mundo físico. Ingiere una polilínea GPS cruda, y dibuja el marcador sobre las calles en la pantalla ajustando los cuadros por segundo según un acelerador simulado.
-3. **Agentes Basados en Objetivos (`AgenteTransporte`):** Posee la meta general. Delega instrucciones seriales y ordenadas al agente físico de movimiento, cerciorándose de que cada museo y parada se concluya en orden.
-4. **Agentes Basados en Utilidad (`AgenteBuscador`):** La clase máxima de inteligencia. Mide matemáticamente la satisfacción (o "Utilidad") de cada ruta DFS posible, ponderando el balance óptimo.
+#### 6.1 Agentes Reactivos Simples (`AgenteGuia`)
+Su arquitectura no contempla memoria histórica. Opera puramente mediante un conjunto de reglas Condición-Acción evaluando los cobros de boletos en la puerta de los museos.
 
 ```python
-# 1. Agente Reactivo Simple (AgenteGuia de agentes_ia.py)
+# Código íntegro de AgenteGuia en agentes_ia.py
 class AgenteGuia:
     def __init__(self, ui_principal, funcion_reloj, funcion_plata, minutos_visita):
         self.interfaz = ui_principal
@@ -175,35 +173,102 @@ class AgenteGuia:
         self.animacion = None
 
     def aterrizaje(self, nombre_edificio, funcion_continuar):
-        # Lógica Reactiva Condición-Acción
+        if nombre_edificio == 'Origen':
+            mensaje = QMessageBox(self.interfaz)
+            mensaje.setWindowTitle("Fin")
+            mensaje.setText("¡Llegaste a casa!")
+            mensaje.setIcon(QMessageBox.Information)
+            mensaje.addButton("Aceptar", QMessageBox.AcceptRole)
+            mensaje.exec_()
+            self.interfaz.consola_registros.append("[Guía] Fin del tour.")
+            self.interfaz.boton_calcular.setEnabled(True)
+            funcion_continuar()
+            return
+
         precio_boleto = ENTRADAS.get(nombre_edificio, 0)
+        mensaje = QMessageBox(self.interfaz)
+        mensaje.setWindowTitle("Museo")
+        mensaje.setText(f"Visitar {nombre_edificio}?")
+        mensaje.setIcon(QMessageBox.Question)
+        mensaje.addButton("Entrar", QMessageBox.AcceptRole)
+        mensaje.exec_()
         if precio_boleto > 0:
             self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
         self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
-        self.animacion = ControladorTurista(self.minutos_visita, multiplicador)
+        multiplicador_aceleracion = int(self.interfaz.combo_acelerador.currentText().replace("x", ""))
+        self.animacion = ControladorTurista(self.minutos_visita, multiplicador_aceleracion)
         self.animacion.senal_reloj.connect(self.interfaz.restar_minutos)
+        
+        def al_salir():
+            self.interfaz.consola_registros.append(f"[Guía] Saliendo de {nombre_edificio}.")
+            nombre_limpio = nombre_edificio.replace("'", "\\'")
+            self.interfaz.visor_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_limpio}', 'green');")
+            funcion_continuar()
+            
+        self.animacion.senal_salida.connect(al_salir)
         self.animacion.start()
+```
 
-# 2. Agente Reactivo Basado en Modelos (AnimadorMovimiento de agentes_ia.py)
+#### 6.2 Agentes Reactivos Basados en Modelos (`AnimadorMovimiento`)
+Contiene una representación interna del mundo físico. Ingiere una polilínea GPS cruda, y dibuja el marcador sobre las calles en la pantalla ajustando los cuadros por segundo según un acelerador simulado.
+
+```python
+# Código íntegro de AnimadorMovimiento en agentes_ia.py
 class AnimadorMovimiento(QThread):
     senal_coordenada = pyqtSignal(float, float, str)
+    senal_reloj = pyqtSignal(float)
+    senal_llegada = pyqtSignal(str)
+
     def __init__(self, lista_geometrias, kmh_auto, kmh_pie, multiplicador_velocidad):
         super().__init__()
         self.trazos = lista_geometrias
+        self.velocidad_metros_auto = (kmh_auto * 1000) / 3600.0
+        self.velocidad_metros_pie = (kmh_pie * 1000) / 3600.0
+        self.multiplicador = multiplicador_velocidad
         self.activo = True
         self.cuadros_por_segundo = 30
         
     def run(self):
-        # Modelo del entorno (Calles y Píxeles)
         for segmento in self.trazos:
+            if not self.activo: break
             puntos_gps = segmento['geometria']
+            tipo_movimiento = segmento['modo']
+            destino_nombre = segmento['destino']
+            
+            if tipo_movimiento == 'Micro':
+                metros_por_segundo = (20.0 * 1000) / 3600.0
+            else:
+                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
+                
             for indice in range(len(puntos_gps) - 1):
+                if not self.activo: break
                 punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
-                # Animación por saltos diferenciales de GPS para el Visor Mapa
-                self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
-                time.sleep(1.0 / self.cuadros_por_segundo)
+                metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
+                if metros_distancia == 0: continue
+                segundos_reales = metros_distancia / metros_por_segundo
+                segundos_animacion = segundos_reales / self.multiplicador
+                cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
+                salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
+                salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
+                minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
+                for frame in range(cantidad_frames):
+                    if not self.activo: break
+                    latitud_dibujada = punto_a[0] + salto_latitud * frame
+                    longitud_dibujada = punto_a[1] + salto_longitud * frame
+                    self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
+                    self.senal_reloj.emit(minutos_reloj_simulado)
+                    time.sleep(1.0 / self.cuadros_por_segundo)
+            if self.activo:
+                self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
+                self.senal_llegada.emit(destino_nombre)
+                self.activo = False 
+```
 
-# 3. Agente Basado en Objetivos (AgenteTransporte de agentes_ia.py)
+#### 6.3 Agentes Basados en Objetivos (`AgenteTransporte`)
+Posee la meta general. Delega instrucciones seriales y ordenadas al agente físico de movimiento, cerciorándose de que cada museo y parada se concluya en orden.
+
+```python
+# Código íntegro de AgenteTransporte en agentes_ia.py
 class AgenteTransporte:
     def __init__(self, consola_ui, web_ui, funcion_dinero, funcion_tiempo):
         self.consola = consola_ui
@@ -212,29 +277,105 @@ class AgenteTransporte:
         self.restar_reloj = funcion_tiempo
         self.ruta_actual = None
         self.indice_tramo = 0
+        self.animacion = None
+        
+    def imprimir(self, texto):
+        self.consola.append(f"[Vehículo] {texto}")
         
     def arrancar_motor(self, datos_ruta, velocidad_coche, velocidad_caminando, acelerador, funcion_llegada):
+        if self.animacion and self.animacion.isRunning():
+            self.animacion.activo = False
+            self.animacion.wait()
         self.ruta_actual = datos_ruta
+        self.indice_tramo = 0
         self.evento_llegada = funcion_llegada
+        self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
+        self.imprimir(f"Iniciando trayecto en x{acelerador}")
         self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
         
     def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
         if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
             segmento = self.ruta_actual['geometrias'][self.indice_tramo]
-            # Delega el objetivo parcial al AnimadorMovimiento y espera su señal de aterrizaje
+            self.imprimir(f"Avanzando a {segmento['destino']} por {segmento['modo']}")
+            
+            costo_monetario = segmento.get('costo', 0)
+            if costo_monetario > 0:
+                self.restar_plata(costo_monetario, f"boleto de {segmento['modo']}")
+                
+            color_pintura = "red"
+            if segmento['modo'] == 'Micro': color_pintura = "purple"
+            
+            es_punteada = "true" if segmento['modo'] == 'Pie' else "false"
+            self.visor_mapa.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_pintura}', {es_punteada});")
+            
             self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
+            self.animacion.senal_coordenada.connect(self.refrescar_pantalla)
+            self.animacion.senal_reloj.connect(self.restar_reloj)
             self.animacion.senal_llegada.connect(self.aterrizaje)
             self.animacion.start()
+            self.velocidad_coche = velocidad_coche
+            self.velocidad_caminando = velocidad_caminando
+            self.acelerador = acelerador
+        else:
+            self.imprimir("Destino final alcanzado.")
 
-# 4. Agente Basado en Utilidad Suprema (AgenteBuscador de agentes_ia.py)
+    def refrescar_pantalla(self, latitud, longitud, transporte):
+        color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
+        self.visor_mapa.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({latitud}, {longitud}, '{color_icono}');")
+
+    def aterrizaje(self, nombre_destino):
+        self.imprimir(f"Vehículo aparcado en {nombre_destino}.")
+        self.indice_tramo += 1
+        self.evento_llegada(nombre_destino, lambda: self.siguiente_movimiento(self.velocidad_coche, self.velocidad_caminando, self.acelerador))
+```
+
+#### 6.4 Agentes Basados en Utilidad (`AgenteBuscador`)
+La clase máxima de inteligencia. Mide matemáticamente la satisfacción (o "Utilidad") de cada ruta DFS posible, ponderando el balance óptimo.
+
+```python
+# Código de la estructura principal de AgenteBuscador en agentes_ia.py 
+# (La inteligencia algorítmica profunda se desglosa matemáticamente en los Puntos 13, 14, 15 y 16)
 class AgenteBuscador(QThread):
+    progreso_senal = pyqtSignal(str)
+    finalizado_senal = pyqtSignal(list)
+    error_senal = pyqtSignal(str)
+    
     def __init__(self, origen, museos, presupuesto, tiempo, vel_auto, vel_pie, tiempo_museo, permitir_pie=True, permitir_taxi=True, permitir_micro=True):
         super().__init__()
         self.coordenada_origen = origen
         self.lista_museos = museos
         self.presupuesto_maximo = presupuesto
         self.tiempo_maximo = tiempo
-        # Su función "run" de inteligencia DFS está desglosada a detalle en los Puntos 13, 14, 15 y 16.
+        self.velocidad_coche = vel_auto / 60.0
+        self.velocidad_caminando = vel_pie / 60.0
+        self.duracion_visita = tiempo_museo
+        self.costo_coche = 5.0
+        self.costo_caminar = 0.0
+        self.permitir_pie = permitir_pie
+        self.permitir_taxi = permitir_taxi
+        self.permitir_micro = permitir_micro
+
+    def run(self):
+        try:
+            coordenadas = {'Origen': self.coordenada_origen}
+            for museo in self.lista_museos: 
+                coordenadas[museo] = MUSEOS[museo]
+
+            rutas_encontradas = []
+            cantidad_museos = len(self.lista_museos)
+            total_combinaciones = sum(math.factorial(cantidad_museos) // math.factorial(cantidad_museos - k) for k in range(1, cantidad_museos + 1))
+            self.contador_exploracion = 0
+
+            # ---> INVOCACIÓN A DFS, PODA Y MACROOPERADORES (Desglosado en Puntos 13, 14, 15 y 16)
+            
+            if rutas_encontradas:
+                max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
+                rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+                self.finalizado_senal.emit(rutas_validas)
+            else:
+                self.finalizado_senal.emit([])
+        except Exception as error_capturado:
+            self.error_senal.emit(str(error_capturado))
 ```
 
 ### 7. Rutas del transporte público y paradas, tramos y paradas
