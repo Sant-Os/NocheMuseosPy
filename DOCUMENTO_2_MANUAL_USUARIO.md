@@ -297,6 +297,32 @@ Matemáticamente, la lentitud temporal del algoritmo sin optimizar es factorial,
 Nuestra Inteligencia Artificial implementa una táctica agresiva de "Corte de Ramas Inútiles" por encima del árbol matemático.
 Este corte evalúa matemáticamente en tiempo real si el acumulado histórico del `Presupuesto` de dinero o del `Tiempo` en un museo intermedio supera las restricciones indicadas por el usuario. Si lo hace, la Inteligencia Axiomáticamente concluye que investigar todo lo que sigue en adelante será inútil, destruyendo por completo todo ese futuro matemático sin procesarlo. Esto acelera un cálculo de años reales a unos formidables y eficientes **cero punto un segundos**.
 
+El siguiente bloque de código detalla exactamente cómo la Inteligencia evalúa los topes máximos y cómo, utilizando la librería nativa de Matemática Factorial, contabiliza el abismal número de combinaciones que acaban de ser salvadas de la memoria por la destrucción inmediata (`return`) de la rama:
+
+```python
+def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
+    
+    # 1. Condición Axiomática de Poda Algorítmica
+    if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+        m = len(museos_faltantes)
+        
+        # 2. Análisis de Complejidad Combinatoria (Ramas Cortadas Matemáticamente)
+        ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+        self.contador_exploracion += ramas_cortadas
+        
+        texto_camino = [abreviar(x) for x in camino_actual] + [abreviar(m) for m in museos_faltantes] + ['Origen']
+        cabecera = f"\\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
+        
+        registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+        registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
+        
+        # Emisión Gráfica del resultado de la Poda hacia la Consola del Usuario
+        self.progreso_senal.emit("\\n".join(registro_final))
+        
+        # 3. Terminación Inmediata de la Exploración (Destrucción de la Ramificación Futura)
+        return
+```
+
 ---
 
 ## CAPÍTULO IV: TAXONOMÍA DE INTELIGENCIA ARTIFICIAL MULTIAGENTE
