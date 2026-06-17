@@ -1,14 +1,16 @@
 # MANUAL EXHAUSTIVO DE DESARROLLO EN PYTHON Y GUÍA DE USUARIO
 ## Proyecto: Optimización de Rutas para la Noche de Museos en Cochabamba
+**Materia:** Inteligencia Artificial
+**Desarrollado por:** Estudiante 1, Estudiante 2, Estudiante 3, Estudiante 4.
 
 ---
 
-Este documento técnico funciona como la piedra angular del desarrollo e implementación del software. Se detalla línea por línea la abstracción técnica detrás de la Inteligencia Artificial construida en Python, junto a las instrucciones estrictas para la configuración e instalación por parte de otros ingenieros y operadores.
+Este documento técnico funciona como la piedra angular del desarrollo e implementación del software que hemos construido. Aquí detallamos línea por línea la abstracción técnica detrás de la Inteligencia Artificial construida por nosotros en Python, junto a las instrucciones estrictas para su configuración e instalación.
 
 ---
 
 ## SECCIÓN I: INSTALACIÓN Y JUSTIFICACIÓN DEL ECOSISTEMA PYTHON
-El programa requiere la instalación de un entorno virtual (`venv` en Python) o la instalación global de las librerías requeridas. El stack tecnológico se construyó para evitar el uso excesivo de servidores backend externos (como NodeJS o Django), condensando tanto la GUI (Interfaz) como la lógica y renderizado web en un solo archivo ejecutable en Python local.
+Nuestro programa requiere la instalación de un entorno virtual (`venv` en Python) o la instalación global de las librerías requeridas. Estructuramos el stack tecnológico para evitar el uso de servidores backend externos, condensando tanto la GUI (Interfaz) como la lógica y renderizado web en un solo archivo ejecutable.
 
 **Comando de instalación global:**
 ```bash
@@ -64,13 +66,17 @@ if ubicacion:
 import requests
 import polyline
 
-# Obteniendo ruta en configuracion.py
-respuesta = requests.get("https://router.project-osrm.org/route/v1/driving/...")
-datos = respuesta.json()
-ruta_encriptada = datos['routes'][0]['geometry']
+# Obteniendo ruta real en configuracion.py
+url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
 
-# Desencriptando a lista de Lat/Lon para la animación
-coordenadas_calle = polyline.decode(ruta_encriptada)
+headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
+respuesta = requests.get(url, headers=headers, timeout=5)
+datos = respuesta.json()
+
+if datos.get('code') == 'Ok':
+    ruta_obtenida = datos['routes'][0]
+    # Desencriptando a lista de Lat/Lon para la animación
+    coordenadas_calle = polyline.decode(ruta_obtenida['geometry'])
 ```
 
 **Explicación de las Bibliotecas Nativas (Preinstaladas en Python):**
@@ -113,12 +119,12 @@ if datos.get('code') == 'Ok':
 ---
 
 ## SECCIÓN II: ARQUITECTURA DE SOFTWARE (PROGRAMACIÓN ORIENTADA A OBJETOS Y QTHREAD)
-En interfaces gráficas, Python ejecuta su código línea por línea en el Hilo principal. Si en la línea 50 le decimos a Python "Explora 10 millones de combinaciones matemáticas para encontrar la ruta a los museos", la interfaz visual (los botones, el mapa) se quedará completamente congelada y bloqueada esperando que la matemática termine, haciendo creer al sistema operativo que la aplicación "Dejó de responder".
+En interfaces gráficas, Python ejecuta su código línea por línea en el Hilo principal. Si le decíamos a Python "Explora 10 millones de combinaciones matemáticas para encontrar la ruta a los museos", la interfaz visual (los botones, el mapa) se quedaba completamente congelada. 
 
 ### 2.1. El Multithreading mediante `QThread`
-La solución técnica fue crear los Agentes usando clases que heredan explícitamente de la librería paralela de Qt (`QThread`). 
-- **Agente `BuscadorRutas`:** Analiza y poda el árbol factorial. Se ejecuta en un núcleo distinto del procesador de su computadora. A medida que avanza, emite una señal nativa `pyqtSignal(str)` que intercepta el Hilo Principal. Esto actualiza la consola en negro con verde del simulador sin colapsar la pantalla.
-- **Agente `AnimadorMovimiento`:** También es un `QThread`. Su función es simple pero vital: posee un bloqueante (`time.sleep(1/30)`) que representa los fotogramas (30 FPS). En cada fotograma, interpola (predice matemáticamente el salto intermedio) la distancia entre un nodo del GPS de la calle y el otro. Emite entonces una señal que le dice a la pantalla: "Actualiza el ícono del auto a esta coordenada", generando así el movimiento simulado súper fluido.
+Nuestra solución técnica fue crear los Agentes usando clases que heredan explícitamente de la librería paralela de Qt (`QThread`). 
+- **Agente `BuscadorRutas`:** Analiza y poda el árbol factorial. Lo programamos para ejecutarse en un núcleo distinto del procesador. A medida que avanza, emite una señal nativa `pyqtSignal(str)` que intercepta el Hilo Principal. Esto actualiza la consola en negro con verde del simulador sin colapsar la pantalla.
+- **Agente `AnimadorMovimiento`:** También lo configuramos como un `QThread`. Su función es simple pero vital: posee un bloqueante (`time.sleep(1/30)`) que representa los fotogramas (30 FPS). En cada fotograma, predice matemáticamente el salto intermedio.
 
 ### 2.2. Rutas, Paradas de Micros y su Incorporación Visual
 
@@ -293,29 +299,52 @@ class AgenteBuscador(QThread):
 ### 2.6.1. Clasificación Teórica de la Inteligencia Artificial (Taxonomía)
 
 1. **Justificación (Teoría):** 
-   Nuestra arquitectura concurrente no fue diseñada al azar. Está fundamentada en la taxonomía teórica clásica de la Inteligencia Artificial (basada en Russell y Norvig):
-   - **Agente Reactivo Simple (`AgenteGuia`):** Actúa únicamente en base a reglas condición-acción. Si detecta que llegó a un museo (condición), ejecuta un temporizador y resta el precio (acción). No guarda historial de dónde vino ni de a dónde va.
-   - **Agente Reactivo Basado en Modelos (`AnimadorMovimiento`):** Toma decisiones manteniendo un estado interno sobre cómo es el mundo actual y cómo evoluciona. Sabe exactamente su coordenada en el mapa en cada fotograma y calcula la interpolación futura del vehículo.
-   - **Agente Basado en Objetivos (`AgenteTransporte`):** Su meta es completar una ruta asignada orquestando a los otros hilos. Lee las paradas y va despachando sub-objetivos de movimiento al animador paso a paso.
-   - **Agente Basado en Utilidad (`AgenteBuscador`):** No se conforma con encontrar "un" camino simple. Evalúa una función matemática de utilidad y poda para encontrar el camino óptimo que maximice la recompensa (cantidad de museos) gastando el menor presupuesto posible.
+   Nuestra arquitectura no fue diseñada al azar por nuestro equipo. Está fundamentada estrictamente en la taxonomía clásica de la Inteligencia Artificial (basada en Russell y Norvig), que hemos adaptado a la geografía y dinámica de los museos de la ciudad de Cochabamba:
+   - **Agente Reactivo Simple (`AgenteGuia`):** Toma decisiones basadas únicamente en la percepción del momento actual. Por ejemplo, si el turista llega a la puerta del "Convento Museo Santa Teresa", nuestro agente no recuerda si el turista vino en Trufi o caminando; simplemente reacciona, cobra la entrada de 15 Bs e inicia el temporizador de visita.
+   - **Agente Reactivo Basado en Modelos (`AnimadorMovimiento`):** Desarrollamos este agente para que mantenga un estado interno sobre cómo es el mundo físico. Calcula de forma determinista dónde debe estar el ícono del vehículo en el siguiente fotograma para generar la ilusión de movimiento.
+   - **Agente Basado en Objetivos (`AgenteTransporte`):** Le programamos la meta absoluta de guiar al turista desde su punto de origen hasta su destino final. Es el orquestador maestro que lee nuestra matriz de rutas de micros de Cochabamba y coordina los despachos del motor de animación.
+   - **Agente Basado en Utilidad (`AgenteBuscador`):** La joya de nuestro proyecto. Su objetivo no es simplemente llegar a la "Casona de Santiváñez", sino que evalúa una función de *utilidad* y *poda algorítmica*. Compara miles de rutas descartando aquellas que sobrepasan el Presupuesto y el Tiempo para maximizar la recompensa del turista.
 
 2. **Comando de Terminal (Instalación):** 
-   *No aplica.* Esta es una clasificación teórica del nivel de la arquitectura de la Inteligencia Artificial.
+   *No aplica.* Esta clasificación es el pilar de la programación de las clases en `agentes_ia.py`.
 
-3. **Código de Ejecución en el Proyecto:**
-   Las clases en `agentes_ia.py` reflejan este comportamiento en sus bucles de ejecución directa:
+3. **Código de Ejecución en el Proyecto (Implementación Real):**
+   Las clases en `agentes_ia.py` contienen el código real que ejecuta estas teorías:
+
 ```python
-# Ejemplo de Agente Basado en Utilidad (AgenteBuscador)
-class AgenteBuscador(QThread):
-    def buscar_rutas_dfs(self):
-        # Explora usando Búsqueda en Profundidad buscando la "máxima utilidad" (más museos, menor costo)
+# 1. AGENTE BASADO EN UTILIDAD (AgenteBuscador)
+# Aplica la "Poda": Descarta la rama si la utilidad (Costo/Tiempo) supera las restricciones.
+if costo_total_evaluado <= self.presupuesto_maximo and tiempo_total_evaluado <= self.tiempo_maximo:
+    # Maximiza la recompensa guardando la ruta válida en la matriz
+    rutas_encontradas.append({
+        'numero_operacion': self.contador_exploracion,
+        'cantidad_museos': len(camino_actual) - 1, # La utilidad máxima a conseguir
+        'dinero_gastado': costo_total_evaluado
+    })
 
-# Ejemplo de Agente Reactivo Simple (AgenteGuia)
-class AgenteGuia(QThread):
-    def run(self):
-        # Regla simple Si-Entonces:
-        if self.tipo_museo == "Especial": 
-            time.sleep(self.tiempo_visita)
+# 2. AGENTE REACTIVO BASADO EN MODELOS (AnimadorMovimiento)
+# Mantiene el modelo del mundo físico interpolando el espacio y tiempo (Física real)
+fraccion = fotograma_actual / total_fotogramas
+lat = lat_a + (lat_b - lat_a) * fraccion
+lon = lon_a + (lon_b - lon_a) * fraccion
+# Altera el entorno mandando la nueva coordenada a la Capa Visual
+self.senal_coordenada.emit(lat, lon, modo_transporte)
+
+# 3. AGENTE BASADO EN OBJETIVOS (AgenteTransporte)
+# Cumple el objetivo principal delegando tareas y conectando eventos asíncronos.
+def despachar_ruta(self):
+    self.animador = AnimadorMovimiento(self.ruta['geometrias'], ...)
+    # Si el animador llega al objetivo, el Agente Transporte toma el control de nuevo
+    self.animador.senal_llegada.connect(self.procesar_llegada)
+    self.animador.start()
+
+# 4. AGENTE REACTIVO SIMPLE (AgenteGuia)
+# Actúa sobre reglas simples Si-Entonces. Cobra entrada y restaura el control.
+def run(self):
+    tiempo_espera = self.duracion / self.multiplicador
+    time.sleep(tiempo_espera) # Reacción: Detener a la persona en el museo
+    self.senal_cobro.emit(self.costo_entrada) # Reacción: Cobrar dinero
+    self.senal_fin.emit()
 ```
 
 ---
@@ -370,36 +399,42 @@ elif tipo_viaje == 'Auto':
 
 ---
 
-### 2.9. Filtrado y Despliegue de Resultados (Rutas Óptimas)
+### 2.9. Filtrado y Despliegue de Resultados (Historial de Rutas)
 
 1. **Justificación (Teoría):** 
-   Si el turista elige 10 museos pero solo tiene tiempo para 3, el sistema ya no da "Error". A medida que la Búsqueda en Profundidad avanza, guarda todas las "Rutas Parciales" que logró validar antes de que el tiempo se agotara. 
-   Al terminar la simulación, el sistema revisa esta enorme base de datos local y extrae el **Número Máximo** de museos que fue capaz de enlazar. Luego, filtra únicamente los caminos que lograron esa cifra récord y los muestra en la consola visual. 
+   Si el turista elige 10 museos pero solo tiene tiempo para 3, el sistema no falla. A medida que la Búsqueda en Profundidad avanza, inyecta su "Número de Operación" en las rutas que lograron cumplir los límites de presupuesto y tiempo.
+   Al finalizar, el servidor extrae la cantidad máxima de museos alcanzada por la mejor ruta, y devuelve un **Historial Exhaustivo** a la pantalla ordenado cronológicamente según cómo fueron validados, mostrando el identificador de la operación para mantener un registro transparente.
 
 2. **Comando de Terminal (Instalación):** 
    *No aplica.*
 
 3. **Código de Ejecución en el Proyecto:**
-   Este bloque toma las miles de rutas parciales guardadas y saca a las ganadoras:
+   Este bloque inyecta la operación y devuelve los ganadores (Extracto de `agentes_ia.py`):
 ```python
-# Lógica de Filtrado final en agentes_ia.py
-if self.rutas_parciales_validas:
-    # 1. ¿Cuál es el récord de museos visitados antes de quedarse sin tiempo?
-    max_visitados = max(len(ruta) for ruta in self.rutas_parciales_validas)
+# Lógica de Extracción Final en agentes_ia.py
+rutas_encontradas.append({
+    'numero_operacion': self.contador_exploracion,
+    'nombre_ruta': " -> ".join([abreviar(x) for x in camino_actual[1:]]),
+    'cantidad_museos': len(camino_actual) - 1,
+    # ... otros metadatos
+})
+
+if rutas_encontradas:
+    # 1. ¿Cuál es el récord de museos visitados?
+    max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
     
     # 2. Rescatar solo las rutas que igualan el récord
-    mejores_rutas = [r for r in self.rutas_parciales_validas if len(r) == max_visitados]
+    rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
     
-    # 3. Imprimir el orden en pantalla
-    for i, datos_ruta in enumerate(mejores_rutas[:5]): # Muestra el Top 5
-        self.ruta_encontrada.emit(datos_ruta['trayecto'], datos_ruta['tiempo'], datos_ruta['costo'])
+    # 3. Enviar todo el historial a la interfaz en su orden original
+    self.finalizado_senal.emit(rutas_validas)
 ```
 
 ---
 
 ## SECCIÓN III: MANUAL OPERATIVO PARA EL USUARIO DEL SIMULADOR
 
-El simulador, a pesar de tener toda la carga compleja algorítmica y teórica expuesta previamente, dispone de una Interfaz de Usuario pensada ergonómicamente. A continuación los pasos y lógica de cada sección:
+El simulador que hemos desarrollado, a pesar de tener toda la carga algorítmica y teórica expuesta previamente, dispone de una Interfaz de Usuario que nuestro equipo diseñó ergonómicamente. A continuación explicamos los pasos y lógica de uso:
 
 ### PASO 1: Ingreso de Variables Estructurales (Módulo Izquierdo)
 
