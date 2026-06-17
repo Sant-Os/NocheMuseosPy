@@ -165,55 +165,76 @@ El ecosistema completo del simulador funciona gracias a la Inteligencia Artifici
 4. **Agentes Basados en Utilidad (`AgenteBuscador`):** La clase máxima de inteligencia. Mide matemáticamente la satisfacción (o "Utilidad") de cada ruta DFS posible, ponderando el balance óptimo.
 
 ```python
-# Implementación de Agente Reactivo basado en Modelo (AnimadorMovimiento de agentes_ia.py)
+# 1. Agente Reactivo Simple (AgenteGuia de agentes_ia.py)
+class AgenteGuia:
+    def __init__(self, ui_principal, funcion_reloj, funcion_plata, minutos_visita):
+        self.interfaz = ui_principal
+        self.restar_reloj = funcion_reloj 
+        self.restar_plata = funcion_plata
+        self.minutos_visita = minutos_visita
+        self.animacion = None
+
+    def aterrizaje(self, nombre_edificio, funcion_continuar):
+        # Lógica Reactiva Condición-Acción
+        precio_boleto = ENTRADAS.get(nombre_edificio, 0)
+        if precio_boleto > 0:
+            self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
+        self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
+        self.animacion = ControladorTurista(self.minutos_visita, multiplicador)
+        self.animacion.senal_reloj.connect(self.interfaz.restar_minutos)
+        self.animacion.start()
+
+# 2. Agente Reactivo Basado en Modelos (AnimadorMovimiento de agentes_ia.py)
 class AnimadorMovimiento(QThread):
     senal_coordenada = pyqtSignal(float, float, str)
-    senal_reloj = pyqtSignal(float)
-    senal_llegada = pyqtSignal(str)
-
     def __init__(self, lista_geometrias, kmh_auto, kmh_pie, multiplicador_velocidad):
         super().__init__()
         self.trazos = lista_geometrias
-        self.velocidad_metros_auto = (kmh_auto * 1000) / 3600.0
-        self.velocidad_metros_pie = (kmh_pie * 1000) / 3600.0
-        self.multiplicador = multiplicador_velocidad
         self.activo = True
         self.cuadros_por_segundo = 30
         
     def run(self):
+        # Modelo del entorno (Calles y Píxeles)
         for segmento in self.trazos:
-            if not self.activo: break
             puntos_gps = segmento['geometria']
-            tipo_movimiento = segmento['modo']
-            destino_nombre = segmento['destino']
-            
-            if tipo_movimiento == 'Micro':
-                metros_por_segundo = (20.0 * 1000) / 3600.0
-            else:
-                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
-                
             for indice in range(len(puntos_gps) - 1):
-                if not self.activo: break
                 punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
-                metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
-                if metros_distancia == 0: continue
-                segundos_reales = metros_distancia / metros_por_segundo
-                segundos_animacion = segundos_reales / self.multiplicador
-                cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
-                salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
-                salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
-                minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
-                for frame in range(cantidad_frames):
-                    if not self.activo: break
-                    latitud_dibujada = punto_a[0] + salto_latitud * frame
-                    longitud_dibujada = punto_a[1] + salto_longitud * frame
-                    self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
-                    self.senal_reloj.emit(minutos_reloj_simulado)
-                    time.sleep(1.0 / self.cuadros_por_segundo)
-            if self.activo:
-                self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
-                self.senal_llegada.emit(destino_nombre)
-                self.activo = False 
+                # Animación por saltos diferenciales de GPS para el Visor Mapa
+                self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
+                time.sleep(1.0 / self.cuadros_por_segundo)
+
+# 3. Agente Basado en Objetivos (AgenteTransporte de agentes_ia.py)
+class AgenteTransporte:
+    def __init__(self, consola_ui, web_ui, funcion_dinero, funcion_tiempo):
+        self.consola = consola_ui
+        self.visor_mapa = web_ui
+        self.restar_plata = funcion_dinero
+        self.restar_reloj = funcion_tiempo
+        self.ruta_actual = None
+        self.indice_tramo = 0
+        
+    def arrancar_motor(self, datos_ruta, velocidad_coche, velocidad_caminando, acelerador, funcion_llegada):
+        self.ruta_actual = datos_ruta
+        self.evento_llegada = funcion_llegada
+        self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
+        
+    def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
+        if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
+            segmento = self.ruta_actual['geometrias'][self.indice_tramo]
+            # Delega el objetivo parcial al AnimadorMovimiento y espera su señal de aterrizaje
+            self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
+            self.animacion.senal_llegada.connect(self.aterrizaje)
+            self.animacion.start()
+
+# 4. Agente Basado en Utilidad Suprema (AgenteBuscador de agentes_ia.py)
+class AgenteBuscador(QThread):
+    def __init__(self, origen, museos, presupuesto, tiempo, vel_auto, vel_pie, tiempo_museo, permitir_pie=True, permitir_taxi=True, permitir_micro=True):
+        super().__init__()
+        self.coordenada_origen = origen
+        self.lista_museos = museos
+        self.presupuesto_maximo = presupuesto
+        self.tiempo_maximo = tiempo
+        # Su función "run" de inteligencia DFS está desglosada a detalle en los Puntos 13, 14, 15 y 16.
 ```
 
 ### 7. Rutas del transporte público y paradas, tramos y paradas
