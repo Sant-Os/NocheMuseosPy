@@ -4,453 +4,571 @@ import folium
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QSpinBox, QPushButton, 
                              QListWidget, QTextEdit, QMessageBox, QGroupBox, 
-                             QLineEdit, QListWidgetItem, QComboBox)
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
+                             QLineEdit, QListWidgetItem, QComboBox, QApplication,
+                             QCheckBox)
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineSettings
 from PyQt5.QtCore import QUrl, pyqtSignal, Qt, QUrlQuery
 from geopy.geocoders import Nominatim
 from configuracion import MUSEOS
-from agentes_ia import AgenteTransporte, AgenteGuiaLocal, AgenteBuscadorInterno
+from agentes_ia import AgenteTransporte, AgenteGuia, AgenteBuscador
 
-class PaginaMapaWeb(QWebEnginePage):
-    map_clicked = pyqtSignal(float, float)
-    def acceptNavigationRequest(self, url, _type, isMainFrame):
+class InterfazMapaWeb(QWebEnginePage):
+    clic_mapa_senal = pyqtSignal(float, float)
+    def acceptNavigationRequest(self, url, tipo_navegacion, es_marco_principal):
         if url.scheme() == "pyqt" and url.host() == "mapclick":
-            query = QUrlQuery(url)
-            lat = float(query.queryItemValue("lat"))
-            lon = float(query.queryItemValue("lon"))
-            self.map_clicked.emit(lat, lon)
+            parametros = QUrlQuery(url)
+            latitud = float(parametros.queryItemValue("lat"))
+            longitud = float(parametros.queryItemValue("lon"))
+            self.clic_mapa_senal.emit(latitud, longitud)
             return False
-        return super().acceptNavigationRequest(url, _type, isMainFrame)
+        return super().acceptNavigationRequest(url, tipo_navegacion, es_marco_principal)
 
-
+    def javaScriptConsoleMessage(self, nivel, mensaje, linea, id_fuente):
+        pass
 
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Simulador de IA Avanzado: Noche de Museos")
+        self.setWindowTitle("Noche de Museos")
         self.resize(1300, 850)
         self.tiempo_disponible = 0
         self.presupuesto_disponible = 0
-        self.coords_origen = None
-        self.geolocator = Nominatim(user_agent="noche_museos_sim")
-        self.init_ui()
-        self.actualizar_mapa()
-        self.transporte = AgenteTransporte(self.consola_registros, self.vista_web, self.descontar_dinero, self.descontar_tiempo_tick)
+        self.coordenada_origen = None
+        self.geolocalizador = Nominatim(user_agent="noche_museos_sim")
+        self.construir_interfaz()
+        self.dibujar_mapa()
+        self.transporte = AgenteTransporte(self.consola_registros, self.visor_web, self.restar_plata, self.restar_minutos)
         self.guia = None 
 
-    def init_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        diseno_principal = QHBoxLayout(central_widget)
+    def construir_interfaz(self):
+        widget_central = QWidget()
+        self.setCentralWidget(widget_central)
+        diseno_principal = QHBoxLayout(widget_central)
         diseno_izquierdo = QVBoxLayout()
         diseno_izquierdo.setContentsMargins(10, 10, 10, 10)
-        group_inputs = QGroupBox("1. Origen y Presupuesto")
-        form_layout = QVBoxLayout()
-        form_layout.addWidget(QLabel("Dirección Origen (o HAZ CLIC EN EL MAPA):"))
-        h_origen = QHBoxLayout()
-        self.txt_origen = QLineEdit()
-        self.txt_origen.setPlaceholderText("Ej. Plaza Cala Cala")
-        h_origen.addWidget(self.txt_origen)
-        self.btn_geolocalizar = QPushButton("Origen")
-        self.btn_geolocalizar.setStyleSheet("background-color: #607D8B; color: white; padding: 4px 15px; font-weight: bold;")
-        self.btn_geolocalizar.clicked.connect(self.fijar_origen)
-        h_origen.addWidget(self.btn_geolocalizar)
-        form_layout.addLayout(h_origen)
-        h_presupuesto = QHBoxLayout()
-        h_presupuesto.addWidget(QLabel("Presupuesto (Bs):"))
-        self.spin_presupuesto = QSpinBox()
-        self.spin_presupuesto.setRange(0, 5000)
-        self.spin_presupuesto.setValue(0)
-        h_presupuesto.addWidget(self.spin_presupuesto)
-        h_presupuesto.addWidget(QLabel("Tiempo Total (min):"))
-        self.spin_tiempo = QSpinBox()
-        self.spin_tiempo.setRange(0, 1440)
-        self.spin_tiempo.setValue(0)
-        h_presupuesto.addWidget(self.spin_tiempo)
-        form_layout.addLayout(h_presupuesto)
-        group_inputs.setLayout(form_layout)
-        diseno_izquierdo.addWidget(group_inputs)
-        group_fisica = QGroupBox("2. Física y Simulación")
-        f_fisica = QVBoxLayout()
-        h1 = QHBoxLayout()
-        h1.addWidget(QLabel("Velocidad Auto (km/h):"))
-        self.spin_vauto = QSpinBox()
-        self.spin_vauto.setRange(10, 150)
-        self.spin_vauto.setValue(40)
-        h1.addWidget(self.spin_vauto)
-        h1.addWidget(QLabel("Vel. a Pie (km/h):"))
-        self.spin_vpie = QSpinBox()
-        self.spin_vpie.setRange(1, 15)
-        self.spin_vpie.setValue(5)
-        h1.addWidget(self.spin_vpie)
-        f_fisica.addLayout(h1)
-        h2 = QHBoxLayout()
-        h2.addWidget(QLabel("Visita a Museos (min):"))
-        self.spin_vmuseo = QSpinBox()
-        self.spin_vmuseo.setRange(0, 120)
-        self.spin_vmuseo.setValue(0)
-        h2.addWidget(self.spin_vmuseo)
-        h2.addWidget(QLabel("Acelerar Simulación:"))
-        self.combo_multi = QComboBox()
-        self.combo_multi.addItems(["x1", "x2", "x5", "x10", "x15", "x20", "x25"])
-        self.combo_multi.setCurrentIndex(0)
-        h2.addWidget(self.combo_multi)
-        f_fisica.addLayout(h2)
-        group_fisica.setLayout(f_fisica)
-        diseno_izquierdo.addWidget(group_fisica)
-        diseno_izquierdo.addWidget(QLabel("3. Selecciona los museos (Recomendado máx 6):"))
-        self.lista_museos = QListWidget()
-        self.lista_museos.setMaximumHeight(200)
-        item_peatonal = QListWidgetItem("--- RUTA PEATONAL ---")
-        item_peatonal.setFlags(Qt.NoItemFlags)
-        font = item_peatonal.font()
-        font.setBold(True)
-        item_peatonal.setFont(font)
-        item_peatonal.setForeground(Qt.blue)
-        self.lista_museos.addItem(item_peatonal)
-        for m in list(MUSEOS.keys())[:10]:
+        
+        grupo_entradas = QGroupBox("1. Origen y Presupuesto")
+        formulario = QVBoxLayout()
+        formulario.addWidget(QLabel("Punto de partida (o HAZ CLIC EN EL MAPA):"))
+        caja_origen = QHBoxLayout()
+        self.campo_origen = QLineEdit()
+        self.campo_origen.setPlaceholderText("Ej. Plaza Cala Cala")
+        caja_origen.addWidget(self.campo_origen)
+        self.boton_geolocalizar = QPushButton("Origen")
+        self.boton_geolocalizar.setStyleSheet("background-color: #607D8B; color: white; padding: 4px 15px; font-weight: bold;")
+        self.boton_geolocalizar.clicked.connect(self.establecer_origen)
+        caja_origen.addWidget(self.boton_geolocalizar)
+        formulario.addLayout(caja_origen)
+        
+        caja_presupuesto = QHBoxLayout()
+        caja_presupuesto.addWidget(QLabel("Presupuesto (Bs):"))
+        self.selector_presupuesto = QSpinBox()
+        self.selector_presupuesto.setRange(0, 5000)
+        self.selector_presupuesto.setValue(0)
+        caja_presupuesto.addWidget(self.selector_presupuesto)
+        caja_presupuesto.addWidget(QLabel("Tiempo Total (min):"))
+        self.selector_tiempo = QSpinBox()
+        self.selector_tiempo.setRange(0, 1440)
+        self.selector_tiempo.setValue(0)
+        caja_presupuesto.addWidget(self.selector_tiempo)
+        formulario.addLayout(caja_presupuesto)
+        grupo_entradas.setLayout(formulario)
+        diseno_izquierdo.addWidget(grupo_entradas)
+        
+        grupo_fisica = QGroupBox("2. Simulación")
+        formulario_fisica = QVBoxLayout()
+        fila_1 = QHBoxLayout()
+        fila_1.addWidget(QLabel("Velocidad Auto (km/h):"))
+        self.selector_vauto = QSpinBox()
+        self.selector_vauto.setRange(10, 150)
+        self.selector_vauto.setValue(40)
+        fila_1.addWidget(self.selector_vauto)
+        fila_1.addWidget(QLabel("Vel. a Pie (km/h):"))
+        self.selector_vpie = QSpinBox()
+        self.selector_vpie.setRange(1, 15)
+        self.selector_vpie.setValue(5)
+        fila_1.addWidget(self.selector_vpie)
+        formulario_fisica.addLayout(fila_1)
+        
+        fila_2 = QHBoxLayout()
+        fila_2.addWidget(QLabel("Visita a Museos (min):"))
+        self.selector_vmuseo = QSpinBox()
+        self.selector_vmuseo.setRange(0, 120)
+        self.selector_vmuseo.setValue(0)
+        fila_2.addWidget(self.selector_vmuseo)
+        fila_2.addWidget(QLabel("Acelerar Simulación:"))
+        self.combo_acelerador = QComboBox()
+        self.combo_acelerador.addItems(["x1", "x2", "x5", "x10", "x15", "x20", "x25"])
+        self.combo_acelerador.setCurrentIndex(0)
+        fila_2.addWidget(self.combo_acelerador)
+        formulario_fisica.addLayout(fila_2)
+        grupo_fisica.setLayout(formulario_fisica)
+        diseno_izquierdo.addWidget(grupo_fisica)
+        
+        grupo_transporte = QGroupBox("3. Modos de Transporte Permitidos")
+        formulario_transporte = QHBoxLayout()
+        self.check_pie = QCheckBox("Pie")
+        self.check_pie.setChecked(True)
+        self.check_taxi = QCheckBox("Taxi")
+        self.check_taxi.setChecked(True)
+        self.check_micro = QCheckBox("Micro")
+        self.check_micro.setChecked(True)
+        formulario_transporte.addWidget(self.check_pie)
+        formulario_transporte.addWidget(self.check_taxi)
+        formulario_transporte.addWidget(self.check_micro)
+        grupo_transporte.setLayout(formulario_transporte)
+        diseno_izquierdo.addWidget(grupo_transporte)
+        
+        diseno_izquierdo.addWidget(QLabel("4. Museos:"))
+        self.lista_interfaz_museos = QListWidget()
+        self.lista_interfaz_museos.setMaximumHeight(200)
+        
+        item_seccion1 = QListWidgetItem("--- RUTA PEATONAL ---")
+        item_seccion1.setFlags(Qt.NoItemFlags)
+        fuente = item_seccion1.font()
+        fuente.setBold(True)
+        item_seccion1.setFont(fuente)
+        item_seccion1.setForeground(Qt.blue)
+        self.lista_interfaz_museos.addItem(item_seccion1)
+        
+        nombres_museos = list(MUSEOS.keys())
+        for m in nombres_museos[:10]:
             item = QListWidgetItem(m)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
-            self.lista_museos.addItem(item)
-        item_movil = QListWidgetItem("--- RUTA MÓVIL ---")
-        item_movil.setFlags(Qt.NoItemFlags)
-        item_movil.setFont(font)
-        item_movil.setForeground(Qt.blue)
-        self.lista_museos.addItem(item_movil)
-        for m in list(MUSEOS.keys())[10:]:
+            self.lista_interfaz_museos.addItem(item)
+            
+        item_seccion2 = QListWidgetItem("--- RUTA MÓVIL ---")
+        item_seccion2.setFlags(Qt.NoItemFlags)
+        item_seccion2.setFont(fuente)
+        item_seccion2.setForeground(Qt.blue)
+        self.lista_interfaz_museos.addItem(item_seccion2)
+        
+        for m in nombres_museos[10:]:
             item = QListWidgetItem(m)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
-            self.lista_museos.addItem(item)
-        self.lista_museos.itemChanged.connect(self.al_seleccionar_museo)
-        diseno_izquierdo.addWidget(self.lista_museos)
-        h_botones = QHBoxLayout()
-        self.btn_calcular = QPushButton("Calcular")
-        self.btn_calcular.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
-        self.btn_calcular.clicked.connect(self.calcular_rutas)
-        h_botones.addWidget(self.btn_calcular)
-        self.btn_detener = QPushButton("Reiniciar")
-        self.btn_detener.setStyleSheet("background-color: #F44336; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
-        self.btn_detener.clicked.connect(self.detener_y_limpiar)
-        h_botones.addWidget(self.btn_detener)
-        diseno_izquierdo.addLayout(h_botones)
+            self.lista_interfaz_museos.addItem(item)
+            
+        self.lista_interfaz_museos.itemChanged.connect(self.actualizar_checkbox_mapa)
+        diseno_izquierdo.addWidget(self.lista_interfaz_museos)
+        
+        caja_botones = QHBoxLayout()
+        self.boton_calcular = QPushButton("Calcular")
+        self.boton_calcular.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
+        self.boton_calcular.clicked.connect(self.empezar_busqueda)
+        caja_botones.addWidget(self.boton_calcular)
+        
+        self.boton_reiniciar = QPushButton("Reiniciar")
+        self.boton_reiniciar.setStyleSheet("background-color: #F44336; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
+        self.boton_reiniciar.clicked.connect(self.reiniciar_todo)
+        caja_botones.addWidget(self.boton_reiniciar)
+        diseno_izquierdo.addLayout(caja_botones)
 
-        v_rutas = QVBoxLayout()
-        self.combo_rutas = QListWidget()
-        self.combo_rutas.setMaximumHeight(80)
-        self.combo_rutas.setEnabled(False)
-        self.combo_rutas.setStyleSheet("padding: 5px; font-size: 12px;")
-        self.combo_rutas.itemSelectionChanged.connect(self.previsualizar_ruta)
-        self.btn_iniciar = QPushButton("Iniciar")
-        self.btn_iniciar.setEnabled(False)
-        self.btn_iniciar.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
-        self.btn_iniciar.clicked.connect(self.iniciar_recorrido_seleccionado)
-        v_rutas.addWidget(self.combo_rutas)
-        v_rutas.addWidget(self.btn_iniciar)
-        diseno_izquierdo.addLayout(v_rutas)
-        h_restantes = QHBoxLayout()
-        self.lbl_tiempo_restante = QLabel("Tiempo: -")
-        self.lbl_tiempo_restante.setStyleSheet("font-size: 14px; font-weight: bold; color: #E91E63; margin-top: 5px;")
-        h_restantes.addWidget(self.lbl_tiempo_restante)
-        self.lbl_dinero_restante = QLabel("Presupuesto: - Bs")
-        self.lbl_dinero_restante.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3; margin-top: 5px;")
-        h_restantes.addWidget(self.lbl_dinero_restante)
-        diseno_izquierdo.addLayout(h_restantes)
+        lista_rutas_layout = QVBoxLayout()
+        self.lista_resultados = QListWidget()
+        self.lista_resultados.setEnabled(False)
+        self.lista_resultados.setMaximumHeight(100)
+        self.lista_resultados.itemSelectionChanged.connect(self.dibujar_ruta_previa)
+        lista_rutas_layout.addWidget(self.lista_resultados)
+        
+        self.boton_arrancar = QPushButton("Iniciar")
+        self.boton_arrancar.setEnabled(False)
+        self.boton_arrancar.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 6px 20px; font-size: 14px;")
+        self.boton_arrancar.clicked.connect(self.iniciar_simulacion)
+        lista_rutas_layout.addWidget(self.boton_arrancar)
+        diseno_izquierdo.addLayout(lista_rutas_layout)
+
+        caja_marcadores = QHBoxLayout()
+        self.etiqueta_tiempo = QLabel("Tiempo: 0.0 min")
+        self.etiqueta_tiempo.setStyleSheet("font-size: 14px; font-weight: bold; color: #E91E63;")
+        caja_marcadores.addWidget(self.etiqueta_tiempo)
+        self.etiqueta_dinero = QLabel("Presupuesto: 0.0 Bs")
+        self.etiqueta_dinero.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3;")
+        caja_marcadores.addWidget(self.etiqueta_dinero)
+        diseno_izquierdo.addLayout(caja_marcadores)
+
         self.consola_registros = QTextEdit()
         self.consola_registros.setReadOnly(True)
-        self.consola_registros.setStyleSheet("background-color: #1E1E1E; color: #4CAF50; font-family: Consolas, monospace; font-size: 11px;")
+        self.consola_registros.setStyleSheet("background-color: #1E1E1E; color: #4CAF50; font-family: Consolas; font-size: 11px;")
+        self.consola_registros.setText("Bienvenido al simulador. Configure y calcule rutas.")
         diseno_izquierdo.addWidget(self.consola_registros)
-        diseno_principal.addLayout(diseno_izquierdo, stretch=1)
-        diseno_derecho = QVBoxLayout()
-        self.vista_web = QWebEngineView()
-        self.pagina_mapa = PaginaMapaWeb(self.vista_web)
-        self.pagina_mapa.map_clicked.connect(self.on_map_clicked)
-        self.vista_web.setPage(self.pagina_mapa)
-        diseno_derecho.addWidget(self.vista_web)
-        diseno_principal.addLayout(diseno_derecho, stretch=3)
+        
+        diseno_izquierdo.setStretch(6, 1)
+        diseno_izquierdo.setStretch(8, 2)
+        widget_izquierdo = QWidget()
+        widget_izquierdo.setLayout(diseno_izquierdo)
+        widget_izquierdo.setFixedWidth(450)
+        diseno_principal.addWidget(widget_izquierdo)
 
-    def al_seleccionar_museo(self, item):
-        if not (item.flags() & Qt.ItemIsUserCheckable): return
-        color = "yellow" if item.checkState() == Qt.Checked else "red"
-        nombre_js = item.text().replace("'", "\\'")
-        self.vista_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_js}', '{color}');")
+        self.visor_web = QWebEngineView()
+        self.pagina_web = InterfazMapaWeb(self.visor_web)
+        self.visor_web.setPage(self.pagina_web)
+        self.pagina_web.clic_mapa_senal.connect(self.establecer_coordenadas_mapa)
+        diseno_principal.addWidget(self.visor_web)
 
-    def detener_y_limpiar(self):
-        if self.transporte.hilo_animacion and self.transporte.hilo_animacion.isRunning():
-            self.transporte.hilo_animacion.esta_corriendo = False
-            self.transporte.hilo_animacion.wait()
-        if hasattr(self, 'guia') and self.guia and hasattr(self.guia, 'hilo_visita'):
-            try:
-                self.guia.hilo_visita.terminate()
-                self.guia.hilo_visita.wait()
-            except: pass
-        if hasattr(self, 'hilo_buscador') and self.hilo_buscador and self.hilo_buscador.isRunning():
-            try:
-                self.hilo_buscador.terminate()
-                self.hilo_buscador.wait()
-            except: pass
-        self.btn_calcular.setEnabled(True)
-        if hasattr(self, 'btn_iniciar'):
-            self.btn_iniciar.setEnabled(False)
-        if hasattr(self, 'combo_rutas'):
-            self.combo_rutas.clear()
-            self.combo_rutas.setEnabled(False)
-        for i in range(self.lista_museos.count()):
-            item = self.lista_museos.item(i)
+    def reiniciar_todo(self):
+        self.coordenada_origen = None
+        self.campo_origen.clear()
+        self.selector_presupuesto.setValue(0)
+        self.selector_tiempo.setValue(0)
+        for i in range(self.lista_interfaz_museos.count()):
+            item = self.lista_interfaz_museos.item(i)
             if item.flags() & Qt.ItemIsUserCheckable:
                 item.setCheckState(Qt.Unchecked)
-        self.spin_presupuesto.setValue(0)
-        self.spin_tiempo.setValue(0)
-        self.spin_vmuseo.setValue(0)
-        self.combo_multi.setCurrentIndex(0)
+        self.lista_resultados.clear()
+        self.lista_resultados.setEnabled(False)
+        self.boton_arrancar.setEnabled(False)
+        self.boton_calcular.setEnabled(True)
+        self.etiqueta_tiempo.setText("Tiempo: 0.0 min")
+        self.etiqueta_dinero.setText("Presupuesto: 0.0 Bs")
         self.consola_registros.clear()
-        self.txt_origen.clear()
-        self.coords_origen = None
-        self.tiempo_disponible = 0
-        self.presupuesto_disponible = 0
-        self.lbl_tiempo_restante.setText("Tiempo: -")
-        self.lbl_dinero_restante.setText("Presupuesto: - Bs")
-        self.btn_calcular.setEnabled(True)
-        self.actualizar_mapa()
-        self.consola_registros.append("[Sistema] El programa ha sido restablecido a su estado inicial.")
+        self.consola_registros.setText("Simulador reiniciado.")
+        self.dibujar_mapa()
 
-    def on_map_clicked(self, lat, lon):
-        if self.coords_origen is not None:
-            return 
-        self.coords_origen = (lat, lon)
-        self.consola_registros.append(f"Clic en mapa: ({lat:.5f}, {lon:.5f}). Buscando dirección...")
-        try:
-            loc = self.geolocator.reverse(f"{lat}, {lon}")
-            if loc:
-                calle = loc.address.split(",")[0]
-                self.txt_origen.setText(calle + ", Cbba")
-            else:
-                self.txt_origen.setText(f"{lat:.4f}, {lon:.4f}")
-        except:
-            self.txt_origen.setText(f"{lat:.4f}, {lon:.4f}")
-        self.consola_registros.append(f"Origen fijado por clic interactivo.")
-        self.actualizar_mapa()
-
-    def fijar_origen(self):
-        if self.coords_origen is not None:
-            QMessageBox.information(self, "Aviso", "El origen ya está fijado. Si deseas cambiarlo, presiona 'Detener y Limpiar'.")
+    def establecer_origen(self):
+        direccion = self.campo_origen.text().strip()
+        if not direccion:
+            QMessageBox.warning(self, "Error", "Ingresa una dirección o haz clic en el mapa.")
             return
-        direccion = self.txt_origen.text()
-        if not direccion: return
-        self.consola_registros.append(f"Geolocalizando texto: {direccion}...")
-        QApplication.processEvents()
+        self.consola_registros.append(f"[Geolocalizador] Buscando: {direccion}...")
         try:
-            loc = self.geolocator.geocode(direccion + ", Cochabamba, Bolivia")
-            if loc:
-                self.coords_origen = (loc.latitude, loc.longitude)
-                self.consola_registros.append(f"Origen fijado en: {loc.latitude}, {loc.longitude}")
-                self.actualizar_mapa()
+            localizacion = self.geolocalizador.geocode(f"{direccion}, Cochabamba, Bolivia", timeout=10)
+            if localizacion:
+                self.coordenada_origen = (localizacion.latitude, localizacion.longitude)
+                self.consola_registros.append(f"[Geolocalizador] Origen fijado en: {self.coordenada_origen}")
+                self.dibujar_mapa()
             else:
-                QMessageBox.warning(self, "Error", "Dirección no encontrada.")
-        except Exception as e:
-            self.consola_registros.append(f"Error: {e}")
+                self.consola_registros.append("[Geolocalizador] No se encontró la dirección.")
+                QMessageBox.warning(self, "Error", "No se encontró la dirección. Intenta de nuevo o usa el mapa.")
+        except Exception as error:
+            self.consola_registros.append(f"[Geolocalizador] Error: {error}")
 
-    def actualizar_mapa(self, ruta_activa=None):
-        centro = self.coords_origen if self.coords_origen else [-17.3935, -66.1568]
-        mapa = folium.Map(location=centro, zoom_start=16, tiles="CartoDB positron")
-        museos_json = json.dumps(MUSEOS)
+    def establecer_coordenadas_mapa(self, latitud, longitud):
+        self.coordenada_origen = (latitud, longitud)
+        self.campo_origen.setText(f"{latitud:.5f}, {longitud:.5f}")
+        self.consola_registros.append(f"[Mapa] Origen fijado en: {self.coordenada_origen}")
+        self.dibujar_mapa()
 
-        js_injection = f"""
+    def dibujar_mapa(self, ruta_dibujar=None):
+        centro_mapa = self.coordenada_origen if self.coordenada_origen else [-17.3895, -66.1568]
+        mapa_folium = folium.Map(location=centro_mapa, zoom_start=14, control_scale=True, zoom_control=True, dragging=True)
+        
+        js_movimiento = """
         <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            var map = null;
-            for (var key in window) {{
-                if (key.startsWith('map_') && window[key] instanceof L.Map) {{
-                    map = window[key]; break;
-                }}
-            }}
-            if (map) {{
-                map.on('click', function(e) {{
-                    window.location.href = 'pyqt://mapclick?lat=' + e.latlng.lat + '&lon=' + e.latlng.lng;
-                }});
-                
-                window.museumMarkers = {{}};
-                var museos = {museos_json};
-                
-                for (var nombre in museos) {{
-                    var coord = museos[nombre];
-                    var letra = nombre.charAt(1);
-                    var iconHtml = "<div style='background-color: red; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; font-weight: bold; font-size: 13px; line-height: 20px; border: 1px solid black; box-shadow: 1px 1px 2px rgba(0,0,0,0.5);'>" + letra + "</div>";
-                    var icon = L.divIcon({{
-                        className: 'custom-div-icon',
-                        html: iconHtml,
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    }});
-                    var marker = L.marker([coord[0], coord[1]], {{icon: icon}}).addTo(map);
-                    marker.bindPopup(nombre);
-                    window.museumMarkers[nombre] = marker;
-                }}
-                
-                window.updateMuseumMarker = function(nombre, color) {{
-                    if (window.museumMarkers[nombre]) {{
-                        var markerElement = window.museumMarkers[nombre].getElement();
-                        if (markerElement && markerElement.firstChild) {{
-                            markerElement.firstChild.style.backgroundColor = color;
-                            markerElement.firstChild.style.color = (color === 'yellow') ? 'black' : 'white';
-                        }}
-                    }}
-                }};
-                
-                window.traveledLines = [];
-                window.traveledLine = null;
-                window.startNewTraveledLine = function(color, is_dotted) {{
-                    var dash = is_dotted ? "5, 10" : "0";
-                    var line = L.polyline([], {{color: color, weight: 6, opacity: 1.0, dashArray: dash}}).addTo(map);
-                    window.traveledLine = line;
-                    window.traveledLines.push(line);
-                }};
-                
-                window.movingMarker = null;
-                window.updateMovingMarker = function(lat, lon, color) {{
-                    if (window.movingMarker == null) {{
-                        window.movingMarker = L.circleMarker([lat, lon], {{
-                            radius: 8, color: 'white', fillColor: color, 
-                            fillOpacity: 1, weight: 2
-                        }}).addTo(map);
-                    }} else {{
-                        window.movingMarker.setLatLng([lat, lon]);
-                        window.movingMarker.setStyle({{fillColor: color}});
-                    }}
-                    if (window.traveledLine) {{
-                        window.traveledLine.addLatLng([lat, lon]);
-                    }}
-                }};
-                window.removeMovingMarker = function() {{
-                    if (window.movingMarker) {{
-                        map.removeLayer(window.movingMarker);
-                        window.movingMarker = null;
-                    }}
-                    if (window.traveledLines) {{
-                        window.traveledLines.forEach(function(line) {{
-                            map.removeLayer(line);
-                        }});
-                        window.traveledLines = [];
-                    }}
-                    window.traveledLine = null;
-                }};
-            }}
-        }});
+        var movingMarker = null;
+        var traveledLines = [];
+        var currentTraveledLine = null;
+        var mapInstance = null;
+        var customIcons = {};
+
+        function getIconHtml(color) {
+            return `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.5);"></div>`;
+        }
+
+        setTimeout(function(){
+            for (var key in window) {
+                if (key.startsWith('map_') && window[key] instanceof L.Map) {
+                    mapInstance = window[key];
+                    break;
+                }
+            }
+            mapInstance.on('click', function(e) {
+                window.location.href = "pyqt://mapclick?lat=" + e.latlng.lat + "&lon=" + e.latlng.lng;
+            });
+            
+            document.querySelectorAll('.leaflet-marker-icon').forEach(function(icon) {
+                if(icon.getAttribute('data-museum-name')) {
+                    var title = icon.getAttribute('data-museum-name');
+                    if(window.museumColors && window.museumColors[title]) {}
+                }
+            });
+        }, 1000);
+
+        window.startNewTraveledLine = function(color, isDashed) {
+            if (!mapInstance) return;
+            var options = {color: color, weight: 6, opacity: 0.8};
+            if (isDashed) {
+                options.dashArray = '10, 10';
+            }
+            currentTraveledLine = L.polyline([], options).addTo(mapInstance);
+            traveledLines.push(currentTraveledLine);
+        };
+
+        window.updateMovingMarker = function(lat, lon, color) {
+            if (!mapInstance) return;
+            var latlng = [lat, lon];
+            if (!customIcons[color]) {
+                customIcons[color] = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: getIconHtml(color),
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
+                });
+            }
+            if (movingMarker) {
+                movingMarker.setLatLng(latlng);
+                movingMarker.setIcon(customIcons[color]);
+            } else {
+                movingMarker = L.marker(latlng, {
+                    icon: customIcons[color],
+                    zIndexOffset: 1000
+                }).addTo(mapInstance);
+            }
+            if (currentTraveledLine) {
+                currentTraveledLine.addLatLng(latlng);
+            }
+        };
+
+        window.removeMovingMarker = function() {
+            if (movingMarker && mapInstance) {
+                mapInstance.removeLayer(movingMarker);
+                movingMarker = null;
+            }
+            traveledLines.forEach(function(line) {
+                if(mapInstance) mapInstance.removeLayer(line);
+            });
+            traveledLines = [];
+            currentTraveledLine = null;
+        };
+
+        window.updateMuseumMarker = function(museumName, color) {
+            if (!mapInstance) return;
+            mapInstance.eachLayer(function(layer) {
+                if (layer.options && layer.options.title === museumName) {
+                    var newIcon = L.AwesomeMarkers.icon({
+                        icon: 'info-sign',
+                        markerColor: color,
+                        prefix: 'glyphicon'
+                    });
+                    layer.setIcon(newIcon);
+                }
+            });
+        };
         </script>
         """
-        mapa.get_root().html.add_child(folium.Element(js_injection))
+        mapa_folium.get_root().html.add_child(folium.Element(js_movimiento))
 
-        if self.coords_origen:
-            folium.Marker(location=self.coords_origen, popup="Origen", icon=folium.Icon(color='red', icon='home')).add_to(mapa)
-        if ruta_activa:
-            puntos_ruta = [list(self.coords_origen)] if self.coords_origen else []
-            for tramo in ruta_activa['detalles_ruta']:
-                geom = tramo['geometria']
-                modo = tramo['modo']
-                color = "green"
-                dash = "5, 10" if modo == "Pie" else "0"
-                folium.PolyLine(geom, color=color, weight=6, opacity=0.6, dash_array=dash).add_to(mapa)
-                puntos_ruta.extend(geom)
-            if puntos_ruta:
-                mapa.fit_bounds(puntos_ruta, padding=[40, 40])
-        mapa_path = os.path.abspath("mapa_museos.html")
-        mapa.save(mapa_path)
-        self.vista_web.load(QUrl.fromLocalFile(mapa_path))
+        if self.coordenada_origen:
+            folium.Marker(
+                location=self.coordenada_origen,
+                popup="Punto de Partida",
+                tooltip="Origen",
+                icon=folium.Icon(color='black', icon='home')
+            ).add_to(mapa_folium)
+
+        museos_seleccionados = []
+        for i in range(self.lista_interfaz_museos.count()):
+            elemento = self.lista_interfaz_museos.item(i)
+            if elemento.flags() & Qt.ItemIsUserCheckable and elemento.checkState() == Qt.Checked:
+                museos_seleccionados.append(elemento.text())
+
+        for nombre_museo, coordenadas in MUSEOS.items():
+            color_icono = 'green' if nombre_museo in museos_seleccionados else 'red'
+            folium.Marker(
+                location=coordenadas,
+                popup=nombre_museo,
+                tooltip=nombre_museo,
+                icon=folium.Icon(color=color_icono, icon='info-sign'),
+                title=nombre_museo
+            ).add_to(mapa_folium)
+            
+            letra_museo = nombre_museo.split(']')[0] + ']' if ']' in nombre_museo else nombre_museo[:3]
+            html_etiqueta = f'<div style="font-size: 11pt; font-weight: bold; color: black; text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white; white-space: nowrap;">{letra_museo}</div>'
+            folium.Marker(
+                location=coordenadas,
+                icon=folium.DivIcon(html=html_etiqueta, icon_anchor=(-15, 10))
+            ).add_to(mapa_folium)
+
+        if ruta_dibujar:
+            puntos_encuadre = []
+            if self.coordenada_origen: puntos_encuadre.append(self.coordenada_origen)
+            
+            for segmento in ruta_dibujar['geometrias']:
+                geometria_tramo = segmento['geometria']
+                modo_transporte = segmento['modo']
+                puntos_encuadre.extend(geometria_tramo)
+                
+                color_pincel = 'red' if modo_transporte == 'Auto' else 'blue'
+                estilo_linea = None
+                if modo_transporte == 'Pie':
+                    color_pincel = 'blue'
+                    estilo_linea = '10, 10'
+                elif modo_transporte == 'Micro':
+                    color_pincel = 'purple'
+                elif modo_transporte == 'Micro1':
+                    color_pincel = '#800080'
+                elif modo_transporte == 'Micro2':
+                    color_pincel = '#DA70D6'
+                    
+                folium.PolyLine(
+                    locations=geometria_tramo,
+                    color=color_pincel,
+                    weight=5 if modo_transporte == 'Pie' else 6,
+                    opacity=0.7,
+                    dash_array=estilo_linea,
+                    tooltip=f"{modo_transporte} a {segmento['destino']}"
+                ).add_to(mapa_folium)
+                
+                if segmento['destino'] in MUSEOS:
+                    folium.CircleMarker(
+                        location=MUSEOS[segmento['destino']],
+                        radius=15,
+                        color='orange',
+                        fill=True,
+                        fill_color='orange',
+                        fillOpacity=0.8,
+                        tooltip=f"Parada: {segmento['destino']}"
+                    ).add_to(mapa_folium)
+
+            if puntos_encuadre:
+                mapa_folium.fit_bounds(puntos_encuadre, padding=[40, 40])
+        else:
+            archivo_rutas_trufis = "rutas_trufis.geojson"
+            if os.path.exists(archivo_rutas_trufis):
+                folium.GeoJson(
+                    archivo_rutas_trufis,
+                    name="Rutas de Transporte",
+                    style_function=lambda feature: {
+                        'color': 'gray',
+                        'weight': 2,
+                        'opacity': 0.3
+                    }
+                ).add_to(mapa_folium)
+                
+                try:
+                    with open(archivo_rutas_trufis, "r", encoding="utf-8") as f:
+                        datos_json_trufis = json.load(f)
+                        for elemento in datos_json_trufis.get("features", []):
+                            geometria = elemento.get("geometry", {})
+                            if geometria.get("type") == "LineString":
+                                coord_puntos = geometria.get("coordinates", [])
+                                if len(coord_puntos) >= 2:
+                                    inicio_gps = [coord_puntos[0][1], coord_puntos[0][0]]
+                                    fin_gps = [coord_puntos[-1][1], coord_puntos[-1][0]]
+                                    nombre_linea_bus = elemento.get("properties", {}).get("linea", "Desconocida")
+                                    
+                                    folium.CircleMarker(
+                                        location=inicio_gps, radius=4, color='orange',
+                                        fill=True, fill_color='orange', fillOpacity=0.9,
+                                        tooltip=f"Parada: {nombre_linea_bus}"
+                                    ).add_to(mapa_folium)
+                                    
+                                    folium.CircleMarker(
+                                        location=fin_gps, radius=4, color='orange',
+                                        fill=True, fill_color='orange', fillOpacity=0.9,
+                                        tooltip=f"Parada: {nombre_linea_bus}"
+                                    ).add_to(mapa_folium)
+                except Exception:
+                    pass
+
+        ruta_html = os.path.abspath("mapa_museos.html")
+        mapa_folium.save(ruta_html)
+        self.visor_web.load(QUrl.fromLocalFile(ruta_html))
         try:
-            self.vista_web.loadFinished.disconnect(self.restore_checkbox_colors)
+            self.visor_web.loadFinished.disconnect(self.actualizar_checkbox_mapa)
         except TypeError:
             pass
-        self.vista_web.loadFinished.connect(self.restore_checkbox_colors)
+        self.visor_web.loadFinished.connect(self.actualizar_checkbox_mapa)
 
-    def restore_checkbox_colors(self):
-        for i in range(self.lista_museos.count()):
-            item = self.lista_museos.item(i)
-            if item.flags() & Qt.ItemIsUserCheckable and item.checkState() == Qt.Checked:
-                self.al_seleccionar_museo(item)
+    def actualizar_checkbox_mapa(self):
+        for i in range(self.lista_interfaz_museos.count()):
+            elemento = self.lista_interfaz_museos.item(i)
+            nombre_museo = elemento.text()
+            if elemento.flags() & Qt.ItemIsUserCheckable:
+                color = 'green' if elemento.checkState() == Qt.Checked else 'red'
+                script_js = f"if(window.updateMuseumMarker) window.updateMuseumMarker('{nombre_museo}', '{color}');"
+                self.visor_web.page().runJavaScript(script_js)
 
-    def calcular_rutas(self):
-        if not self.coords_origen:
+    def empezar_busqueda(self):
+        if not self.coordenada_origen:
             QMessageBox.warning(self, "Atención", "Fija un punto de origen (clic en mapa o texto).")
             return
         museos_seleccionados = []
-        for i in range(self.lista_museos.count()):
-            item = self.lista_museos.item(i)
-            if (item.flags() & Qt.ItemIsUserCheckable) and item.checkState() == Qt.Checked:
-                museos_seleccionados.append(item.text())
+        for i in range(self.lista_interfaz_museos.count()):
+            elemento = self.lista_interfaz_museos.item(i)
+            if (elemento.flags() & Qt.ItemIsUserCheckable) and elemento.checkState() == Qt.Checked:
+                museos_seleccionados.append(elemento.text())
         if not museos_seleccionados: return
-        self.btn_calcular.setEnabled(False)
-        self.tiempo_disponible = self.spin_tiempo.value()
-        self.presupuesto_disponible = self.spin_presupuesto.value()
-        self.lbl_tiempo_restante.setText(f"Tiempo: {self.tiempo_disponible:.1f} min")
-        self.lbl_dinero_restante.setText(f"Presupuesto: {self.presupuesto_disponible:.1f} Bs")
+        self.boton_calcular.setEnabled(False)
+        self.tiempo_disponible = self.selector_tiempo.value()
+        self.presupuesto_disponible = self.selector_presupuesto.value()
+        self.etiqueta_tiempo.setText(f"Tiempo: {self.tiempo_disponible:.1f} min")
+        self.etiqueta_dinero.setText(f"Presupuesto: {self.presupuesto_disponible:.1f} Bs")
         self.consola_registros.clear()
         self.consola_registros.append(f"[Buscador] Buscando rutas para {len(museos_seleccionados)} museos...")
-        self.hilo_buscador = AgenteBuscadorInterno(
-            self.coords_origen, museos_seleccionados, self.presupuesto_disponible,
-            self.tiempo_disponible, self.spin_vauto.value(), 
-            self.spin_vpie.value(), self.spin_vmuseo.value()
+        permitir_pie = self.check_pie.isChecked()
+        permitir_taxi = self.check_taxi.isChecked()
+        permitir_micro = self.check_micro.isChecked()
+        
+        self.hilo_buscador = AgenteBuscador(
+            self.coordenada_origen, museos_seleccionados, self.presupuesto_disponible,
+            self.tiempo_disponible, self.selector_vauto.value(), 
+            self.selector_vpie.value(), self.selector_vmuseo.value(),
+            permitir_pie, permitir_taxi, permitir_micro
         )
-        self.hilo_buscador.progress.connect(self.consola_registros.append)
-        self.hilo_buscador.finished.connect(self.on_rutas_calculadas)
-        self.hilo_buscador.error.connect(lambda e: self.consola_registros.append(f"Error: {e}"))
+        self.hilo_buscador.progreso_senal.connect(self.consola_registros.append)
+        self.hilo_buscador.finalizado_senal.connect(self.rutas_calculadas)
+        self.hilo_buscador.error_senal.connect(lambda e: self.consola_registros.append(f"Error: {e}"))
         self.hilo_buscador.start()
 
-    def on_rutas_calculadas(self, rutas_validas):
-        self.btn_calcular.setEnabled(True)
-        if not rutas_validas:
-            self.consola_registros.append("¡NINGUNA ALTERNATIVA ES VÁLIDA! Falta tiempo o presupuesto_max.")
+    def rutas_calculadas(self, opciones_validas):
+        self.boton_calcular.setEnabled(True)
+        if not opciones_validas:
+            self.consola_registros.append("¡NINGUNA ALTERNATIVA ES VÁLIDA! Falta tiempo o presupuesto máximo.")
             QMessageBox.critical(self, "Ruta Imposible", "No alcanza el dinero o el tiempo para ninguna de las opciones. Modifica tus restricciones.")
             return
             
-        max_museos = max(r['num_museos'] for r in rutas_validas)
-        rutas_filtradas = [r for r in rutas_validas if r['num_museos'] == max_museos]
-        rutas_filtradas.sort(key=lambda x: (x['costo'], x['tiempo']))
+        max_visitados = max(r['cantidad_museos'] for r in opciones_validas)
+        opciones_filtradas = [r for r in opciones_validas if r['cantidad_museos'] == max_visitados]
+        opciones_filtradas.sort(key=lambda x: (x['dinero_gastado'], x['minutos_gastados']))
         
-        self.combo_rutas.clear()
-        for r in rutas_filtradas:
-            texto = f"{r['nombre']} | Costo: {r['costo']:.1f} Bs | Tiempo: {r['tiempo']:.1f} min"
-            item = QListWidgetItem(texto)
-            item.setData(Qt.UserRole, r)
-            self.combo_rutas.addItem(item)
+        self.lista_resultados.clear()
+        for ruta in opciones_filtradas:
+            texto_lista = f"{ruta['nombre_ruta']} | Costo: {ruta['dinero_gastado']:.1f} Bs | Tiempo: {ruta['minutos_gastados']:.1f} min"
+            elemento = QListWidgetItem(texto_lista)
+            elemento.setData(Qt.UserRole, ruta)
+            self.lista_resultados.addItem(elemento)
             
-        self.combo_rutas.setEnabled(True)
-        self.btn_iniciar.setEnabled(True)
-        self.consola_registros.append(f"¡Se encontraron {len(rutas_filtradas)} opciones viables que visitan el máximo posible de {max_museos} museos!")
+        self.lista_resultados.setEnabled(True)
+        self.boton_arrancar.setEnabled(True)
+        self.consola_registros.append(f"¡Se encontraron {len(opciones_filtradas)} opciones viables que visitan el máximo posible de {max_visitados} museos!")
         self.consola_registros.append("Selecciona una ruta de la lista y presiona Iniciar.")
-    def previsualizar_ruta(self):
-        item = self.combo_rutas.currentItem()
-        if not item: return
-        ruta_optima = item.data(Qt.UserRole)
-        self.actualizar_mapa(ruta_optima)
-    def iniciar_recorrido_seleccionado(self):
-        item = self.combo_rutas.currentItem()
-        if not item: return
-        ruta_optima = item.data(Qt.UserRole)
-        self.btn_calcular.setEnabled(False)
-        self.btn_iniciar.setEnabled(False)
-        self.combo_rutas.setEnabled(False)
-        self.consola_registros.append(f"\\nOpción seleccionada: {ruta_optima['nombre']}")
-        modos_str = " -> ".join(ruta_optima['modos'])
-        self.consola_registros.append(f"Modos de Transporte elegidos: {modos_str}")
-        self.actualizar_mapa(ruta_optima)
-        self.guia = AgenteGuiaLocal(self, self.descontar_tiempo_tick, self.descontar_dinero, self.spin_vmuseo.value())
-        multi = int(self.combo_multi.currentText().replace("x", ""))
-        self.consola_registros.append("\\n--- INICIANDO SIMULACIÓN ANIMADA ---")
-        self.transporte.iniciar_ruta(
-            ruta_optima, 
-            self.spin_vauto.value(), 
-            self.spin_vpie.value(), 
-            multi,
-            self.guia.procesar_llegada
+        
+    def dibujar_ruta_previa(self):
+        elemento_seleccionado = self.lista_resultados.currentItem()
+        if not elemento_seleccionado: return
+        datos_ruta_optima = elemento_seleccionado.data(Qt.UserRole)
+        self.dibujar_mapa(datos_ruta_optima)
+        
+    def iniciar_simulacion(self):
+        elemento_seleccionado = self.lista_resultados.currentItem()
+        if not elemento_seleccionado: return
+        datos_ruta_optima = elemento_seleccionado.data(Qt.UserRole)
+        self.boton_calcular.setEnabled(False)
+        self.boton_arrancar.setEnabled(False)
+        self.lista_resultados.setEnabled(False)
+        self.consola_registros.append(f"\nOpción seleccionada: {datos_ruta_optima['nombre_ruta']}")
+        vehiculos_str = " -> ".join(datos_ruta_optima['vehiculos_usados'])
+        self.consola_registros.append(f"Modos de Transporte elegidos: {vehiculos_str}")
+        self.dibujar_mapa(datos_ruta_optima)
+        self.guia = AgenteGuia(self, self.restar_minutos, self.restar_plata, self.selector_vmuseo.value())
+        acelerador = int(self.combo_acelerador.currentText().replace("x", ""))
+        self.consola_registros.append("\n--- INICIANDO SIMULACIÓN ANIMADA ---")
+        self.transporte.arrancar_motor(
+            datos_ruta_optima, 
+            self.selector_vauto.value(), 
+            self.selector_vpie.value(), 
+            acelerador,
+            self.guia.aterrizaje
         )
 
-    def descontar_dinero(self, cantidad, concepto):
+    def restar_plata(self, cantidad, motivo):
         if cantidad > 0:
             self.presupuesto_disponible -= cantidad
-            self.lbl_dinero_restante.setText(f"Presupuesto: {self.presupuesto_disponible:.1f} Bs")
-            self.consola_registros.append(f"[Dinero] -{cantidad} Bs por {concepto}. (Quedan {self.presupuesto_disponible} Bs)")
+            self.etiqueta_dinero.setText(f"Presupuesto: {self.presupuesto_disponible:.1f} Bs")
+            self.consola_registros.append(f"[Dinero] -{cantidad} Bs por {motivo}. (Quedan {self.presupuesto_disponible} Bs)")
 
-    def descontar_tiempo_tick(self, minutos):
-        self.tiempo_disponible -= minutos
-        self.lbl_tiempo_restante.setText(f"Tiempo: {self.tiempo_disponible:.1f} min")
+    def restar_minutos(self, reduccion):
+        self.tiempo_disponible -= reduccion
+        self.etiqueta_tiempo.setText(f"Tiempo: {self.tiempo_disponible:.1f} min")

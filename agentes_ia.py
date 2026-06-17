@@ -3,269 +3,418 @@ import math
 import itertools
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox
-from configuracion import calcular_distancia_haversine, obtener_ruta_osrm, ENTRADAS, MUSEOS
+from configuracion import calcular_distancia_directa, obtener_ruta_vehiculo, ENTRADAS, MUSEOS, MATRIZ_TRANSPORTE, LINEAS_TRUFIS
 
-class AgenteBuscadorInterno(QThread):
-    progress = pyqtSignal(str)
-    finished = pyqtSignal(list)
-    error = pyqtSignal(str)
-    def __init__(self, coords_origen, museos_seleccionados, presupuesto_max, tiempo_maximo, velocidad_auto, velocidad_pie, tiempo_por_museo):
+class AgenteBuscador(QThread):
+    progreso_senal = pyqtSignal(str)
+    finalizado_senal = pyqtSignal(list)
+    error_senal = pyqtSignal(str)
+    
+    def __init__(self, origen, museos, presupuesto, tiempo, vel_auto, vel_pie, tiempo_museo, permitir_pie=True, permitir_taxi=True, permitir_micro=True):
         super().__init__()
-        self.coords_origen = coords_origen
-        self.museos_seleccionados = museos_seleccionados
-        self.presupuesto_max = presupuesto_max
-        self.tiempo_maximo = tiempo_maximo
-        self.velocidad_auto = velocidad_auto / 60.0
-        self.velocidad_pie = velocidad_pie / 60.0
-        self.tiempo_por_museo = tiempo_por_museo
-        self.costo_por_km_auto = 2.0       
-        self.costo_por_km_pie = 0.0
+        self.coordenada_origen = origen
+        self.lista_museos = museos
+        self.presupuesto_maximo = presupuesto
+        self.tiempo_maximo = tiempo
+        self.velocidad_coche = vel_auto / 60.0
+        self.velocidad_caminando = vel_pie / 60.0
+        self.duracion_visita = tiempo_museo
+        self.costo_coche = 5.0
+        self.costo_caminar = 0.0
+        self.permitir_pie = permitir_pie
+        self.permitir_taxi = permitir_taxi
+        self.permitir_micro = permitir_micro
 
     def run(self):
         try:
-            coords = {'Origen': self.coords_origen}
-            for m in self.museos_seleccionados: coords[m] = MUSEOS[m]
+            coordenadas = {'Origen': self.coordenada_origen}
+            for museo in self.lista_museos: 
+                coordenadas[museo] = MUSEOS[museo]
 
-            def short(name):
-                return name[:3] if name.startswith('[') else name
+            def abreviar(nombre):
+                return nombre[:3] if nombre.startswith('[') else nombre
 
-            rutas_validas = []
-            n_museos = len(self.museos_seleccionados)
-            total_perms = sum(math.factorial(n_museos) // math.factorial(n_museos - k) for k in range(1, n_museos + 1))
-            self.count = 0
-            def explorar_rama(ruta_actual, museos_pendientes, costo_acumulado, tiempo_acumulado, detalles_ruta, log_lines):
-                if costo_acumulado > self.presupuesto_max or tiempo_acumulado > self.tiempo_maximo:
-                    m = len(museos_pendientes)
-                    podadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
-                    self.count += podadas
-                    ruta_display = [short(x) for x in ruta_actual] + [short(m) for m in museos_pendientes] + ['Origen']
-                    encabezado = f"\nPermutación [{self.count}/{total_perms}]: [{' -> '.join(ruta_display)}]"
-                    log_f = [encabezado, "-" * 65] + list(log_lines)
-                    log_f.append(f"└─ PODA: Costo={costo_acumulado:.1f} Bs | Tiempo={tiempo_acumulado:.1f} min | Descartadas: {podadas} permutación(es)")
-                    self.progress.emit("\n".join(log_f))
-                    return
+            rutas_encontradas = []
+            cantidad_museos = len(self.lista_museos)
+            total_combinaciones = sum(math.factorial(cantidad_museos) // math.factorial(cantidad_museos - k) for k in range(1, cantidad_museos + 1))
+            self.contador_exploracion = 0
 
-                if len(ruta_actual) > 1:
-                    self.count += 1
-                    n1 = ruta_actual[-1]
-                    n2 = 'Origen'
-                    c1 = coords[n1]
-                    c2 = coords[n2]
-                    d = calcular_distancia_haversine(c1, c2)
-                    modo = 'Pie' if d < 0.5 else 'Auto'
-                    modo_str = 'driving' if modo == 'Auto' else 'foot'
-                    distancia_km, t_min, geom = obtener_ruta_osrm(c1, c2, modo_str)
-                    if distancia_km is None:
-                        distancia_km = d * 1.3
-                        geom = [c1, c2]
-                    t_min_custom = distancia_km / self.velocidad_pie if modo == 'Pie' else distancia_km / self.velocidad_auto
-                    costo_final = costo_acumulado + (distancia_km * self.costo_por_km_auto if modo == 'Auto' else 0)
-                    tiempo_final = tiempo_acumulado + t_min_custom
-                    ruta_display = [short(x) for x in ruta_actual] + ['Origen']
-                    encabezado = f"\nPermutación [{self.count}/{total_perms}]: [{' -> '.join(ruta_display)}]"
-                    log_f = [encabezado, "-" * 65] + list(log_lines)
-                    log_f.append(f"|  -> {short(n2):<15} | {distancia_km:>6.2f} km | {t_min_custom:>5.1f} min | {modo}")
-                    if costo_final <= self.presupuesto_max and tiempo_final <= self.tiempo_maximo:
-                        estado = "✔ Válida"
-                        log_f.append(f"└─ Costo: {costo_final:.1f} Bs | Tiempo: {tiempo_final:.1f} min | {estado}")
-                        self.progress.emit("\n".join(log_f))
-                        ruta_completa = ruta_actual + ['Origen']
-                        detalles_completos = detalles_ruta + [{
-                            'origen': n1, 'destino': n2, 'modo': modo,
-                            'distancia': distancia_km, 'tiempo': t_min_custom, 'geometria': geom
-                        }]
-                        modos_completos = [d['modo'] for d in detalles_completos]
-                        rutas_validas.append({
-                            'nombre': " -> ".join([short(x) for x in ruta_actual[1:]]),
-                            'num_museos': len(ruta_actual) - 1,
-                            'ruta': ruta_completa, 'modos': modos_completos, 'costo': costo_final,
-                            'tiempo': tiempo_final, 'detalles_ruta': detalles_completos, 'museos': self.museos_seleccionados
-                        })
+            def calcular_segmento(nodo_a, nodo_b, coord_a, coord_b, tipo_viaje, distancia_lineal):
+                segmentos = []
+                
+
+                if tipo_viaje == 'Pie':
+                    distancia_total_tramo = distancia_lineal * 1.1 
+                    tiempo_total_tramo = distancia_total_tramo / self.velocidad_caminando
+                    _, _, geom_p = obtener_ruta_vehiculo(coord_a, coord_b, perfil="peaton")
+                    geom = geom_p if geom_p else [coord_a, coord_b]
+                    precio_pasaje = 0.0
+                    impresion_modo = "Pie"
+                    segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Pie', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
+                
+
+                elif tipo_viaje == 'Auto':
+                    d_vehiculo, t_vehiculo, geom_vehiculo = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
+                    if geom_vehiculo is None:
+                        distancia_total_tramo = distancia_lineal * 1.3
+                        geom = [coord_a, coord_b]
+                        tiempo_total_tramo = distancia_total_tramo / self.velocidad_coche
                     else:
-                        estado = "✘ Descartada (Retorno excede límite)"
-                        log_f.append(f"└─ Costo: {costo_final:.1f} Bs | Tiempo: {tiempo_final:.1f} min | {estado}")
-                        self.progress.emit("\n".join(log_f))
-                if not museos_pendientes:
+                        distancia_total_tramo = d_vehiculo
+                        geom = geom_vehiculo
+                        tiempo_total_tramo = t_vehiculo
+                    precio_pasaje = self.costo_coche * distancia_total_tramo
+                    impresion_modo = "Auto"
+                    segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Auto', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
+                
+
+                elif tipo_viaje == 'Micro':
+                    info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
+                    id_linea = info_ruta['linea']
+                    ruta_fisica = LINEAS_TRUFIS.get(id_linea)
+                    
+                    if ruta_fisica:
+                        def proyectar_punto(punto):
+                            mejor_idx, min_d = -1, float('inf')
+                            for k, p_ruta in enumerate(ruta_fisica):
+                                d = calcular_distancia_directa(punto, p_ruta)
+                                if d < min_d: min_d, mejor_idx = d, k
+                            return ruta_fisica[mejor_idx], mejor_idx, min_d
+                            
+                        def ubicar_paradas(punto_inicio, punto_fin, coordenadas_ruta):
+                            candidatos_inicio = [(idx, calcular_distancia_directa(punto_inicio, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_inicio, coord) < 0.6]
+                            candidatos_fin = [(idx, calcular_distancia_directa(punto_fin, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_fin, coord) < 0.6]
+                            
+                            if not candidatos_inicio or not candidatos_fin:
+                                _, indice_a, dist_a = proyectar_punto(punto_inicio)
+                                _, indice_b, dist_b = proyectar_punto(punto_fin)
+                                return indice_a, indice_b, dist_a, dist_b
+                                
+                            mejor_a, mejor_b = -1, -1
+                            costo_minimo = float('inf')
+                            
+                            for i, d_pie_inicio in candidatos_inicio:
+                                for j, d_pie_fin in candidatos_fin:
+                                    distancia_nodos = (j - i) if i <= j else (len(coordenadas_ruta) - i + j)
+                                    costo_calculado = d_pie_inicio + d_pie_fin + (distancia_nodos * 0.002)
+                                    if costo_calculado < costo_minimo:
+                                        costo_minimo = costo_calculado
+                                        mejor_a, mejor_b = i, j
+                                        
+                            if mejor_a == -1:
+                                _, indice_a, dist_a = proyectar_punto(punto_inicio)
+                                _, indice_b, dist_b = proyectar_punto(punto_fin)
+                                return indice_a, indice_b, dist_a, dist_b
+                                
+                            return mejor_a, mejor_b, calcular_distancia_directa(punto_inicio, coordenadas_ruta[mejor_a]), calcular_distancia_directa(punto_fin, coordenadas_ruta[mejor_b])
+                            
+                        idx_origen, idx_destino, dist_caminata_1, dist_caminata_2 = ubicar_paradas(coord_a, coord_b, ruta_fisica)
+                        coord_parada_1, coord_parada_2 = ruta_fisica[idx_origen], ruta_fisica[idx_destino]
+                        
+                        _, _, geom_c1 = obtener_ruta_vehiculo(coord_a, coord_parada_1, perfil="peaton")
+                        geom_caminata_1 = geom_c1 if geom_c1 else [coord_a, coord_parada_1]
+                        dist_w1, tiempo_w1 = dist_caminata_1, dist_caminata_1 / self.velocidad_caminando
+                        
+                        if idx_origen <= idx_destino:
+                            geom_micro = ruta_fisica[idx_origen : idx_destino + 1]
+                        else:
+                            geom_micro = ruta_fisica[idx_origen : ] + ruta_fisica[0 : idx_destino + 1]
+                            
+                        dist_micro = sum(calcular_distancia_directa(geom_micro[k], geom_micro[k+1]) for k in range(len(geom_micro)-1)) if len(geom_micro) > 1 else 0
+                        tiempo_micro = (dist_micro * 1.3) / (20.0 / 60.0)
+                        
+                        _, _, geom_c2 = obtener_ruta_vehiculo(coord_parada_2, coord_b, perfil="peaton")
+                        geom_caminata_2 = geom_c2 if geom_c2 else [coord_parada_2, coord_b]
+                        dist_w2, tiempo_w2 = dist_caminata_2, dist_caminata_2 / self.velocidad_caminando
+                        
+                        precio_pasaje = info_ruta['costo_pasaje']
+                        
+                        tiempo_total_tramo = tiempo_w1 + tiempo_micro + tiempo_w2
+                        distancia_total_tramo = dist_w1 + dist_micro + dist_w2
+                        impresion_modo = f"Micro ({id_linea})"
+                        
+                        segmentos.extend([
+                            {'origen': nodo_a, 'destino': f'Parada({abreviar(nodo_a)})', 'modo': 'Pie', 'distancia': dist_w1, 'tiempo': tiempo_w1, 'geometria': geom_caminata_1, 'costo': 0.0},
+                            {'origen': f'Parada({abreviar(nodo_a)})', 'destino': f'Parada({abreviar(nodo_b)})', 'modo': 'Micro', 'distancia': dist_micro, 'tiempo': tiempo_micro, 'geometria': geom_micro, 'costo': precio_pasaje},
+                            {'origen': f'Parada({abreviar(nodo_b)})', 'destino': nodo_b, 'modo': 'Pie', 'distancia': dist_w2, 'tiempo': tiempo_w2, 'geometria': geom_caminata_2, 'costo': 0.0}
+                        ])
+                    else:
+                        precio_pasaje = info_ruta['costo_pasaje']
+                        _, _, geom_vehicular = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
+                        geom = geom_vehicular if geom_vehicular else [coord_a, coord_b]
+                        distancia_total_tramo = distancia_lineal * 1.3
+                        tiempo_total_tramo = distancia_total_tramo / (20.0 / 60.0)
+                        impresion_modo = "Micro"
+                        segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Micro', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
+                
+                return segmentos, precio_pasaje, tiempo_total_tramo, distancia_total_tramo, impresion_modo
+
+            def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
+                if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+                    m = len(museos_faltantes)
+                    ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+                    self.contador_exploracion += ramas_cortadas
+                    
+                    texto_camino = [abreviar(x) for x in camino_actual] + [abreviar(m) for m in museos_faltantes] + ['Origen']
+                    cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
+                    registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                    registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
+                    self.progreso_senal.emit("\n".join(registro_final))
                     return
 
-                for siguiente in museos_pendientes:
-                    n1 = ruta_actual[-1]
-                    n2 = siguiente
-                    c1 = coords[n1]
-                    c2 = coords[n2]
-                    d = calcular_distancia_haversine(c1, c2)
-                    modo = 'Pie' if d < 0.5 else 'Auto'
-                    modo_str = 'driving' if modo == 'Auto' else 'foot'
-                    distancia_km, t_min, geom = obtener_ruta_osrm(c1, c2, modo_str)
-                    if distancia_km is None:
-                        distancia_km = d * 1.3
-                        geom = [c1, c2]
-                    t_min_custom = distancia_km / self.velocidad_pie if modo == 'Pie' else distancia_km / self.velocidad_auto
-                    nuevo_costo = costo_acumulado + ENTRADAS[n2] + (distancia_km * self.costo_por_km_auto if modo == 'Auto' else 0)
-                    nuevo_tiempo = tiempo_acumulado + self.tiempo_por_museo + t_min_custom
-                    nueva_linea = f"|  -> {short(n2):<15} | {distancia_km:>6.2f} km | {t_min_custom:>5.1f} min | {modo}"
-                    nuevo_detalles = detalles_ruta + [{
-                        'origen': n1, 'destino': n2, 'modo': modo,
-                        'distancia': distancia_km, 'tiempo': t_min_custom, 'geometria': geom
-                    }]
-                    nuevos_pendientes = [m for m in museos_pendientes if m != siguiente]
-                    explorar_rama(ruta_actual + [siguiente], nuevos_pendientes, nuevo_costo, nuevo_tiempo, nuevo_detalles, log_lines + [nueva_linea])
+                if len(camino_actual) > 1:
+                    origen_tramo = camino_actual[-1]
+                    destino_tramo = 'Origen'
+                    coord_origen_tramo, coord_destino_tramo = coordenadas[origen_tramo], coordenadas['Origen']
+                    distancia_recta = calcular_distancia_directa(coord_origen_tramo, coord_destino_tramo)
+                    
+                    opciones_transporte = []
+                    if modo_fijo == 'Pie': opciones_transporte.append('Pie')
+                    elif modo_fijo == 'Auto': opciones_transporte.append('Auto')
+                    elif modo_fijo == 'Micro':
+                        if origen_tramo in MATRIZ_TRANSPORTE and destino_tramo in MATRIZ_TRANSPORTE[origen_tramo] and MATRIZ_TRANSPORTE[origen_tramo][destino_tramo]['costo_pasaje'] < float('inf'):
+                            opciones_transporte.append('Micro')
+                        
+                    for tipo_transporte in opciones_transporte:
+                        self.contador_exploracion += 1
+                        
+                        nuevos_segmentos, costo_tramo, tiempo_tramo, distancia_km, texto_modo = calcular_segmento(origen_tramo, destino_tramo, coord_origen_tramo, coord_destino_tramo, tipo_transporte, distancia_recta)
 
-            explorar_rama(['Origen'], self.museos_seleccionados, 0.0, 0.0, [], [])
-            rutas_validas.sort(key=lambda x: (x['costo'], x['tiempo']))
-            self.finished.emit(rutas_validas)
-        except Exception as e:
-            self.error.emit(str(e))
+                        costo_total_evaluado = gasto_acumulado + costo_tramo
+                        tiempo_total_evaluado = reloj_acumulado + tiempo_tramo
+                        
+                        texto_camino = [abreviar(x) for x in camino_actual] + ['Origen']
+                        cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}] usando {texto_modo}"
+                        registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                        registro_final.append(f"|  -> {abreviar(destino_tramo):<15} | {distancia_km:>6.2f} km | {tiempo_tramo:>5.1f} min | {texto_modo} ({costo_tramo:.1f} Bs)")
+                        
+                        if costo_total_evaluado <= self.presupuesto_maximo and tiempo_total_evaluado <= self.tiempo_maximo:
+                            registro_final.append(f"└─ TOTALES: {costo_total_evaluado:.1f} Bs | {tiempo_total_evaluado:.1f} min | ✔ CORRECTA ({len(camino_actual)-1} Museos)")
+                            self.progreso_senal.emit("\n".join(registro_final))
+                            
+                            ruta_definitiva = camino_actual + ['Origen']
+                            trazos_definitivos = trazos_ruta + nuevos_segmentos
+                            lista_modos = [segmento['modo'] for segmento in trazos_definitivos]
+                            rutas_encontradas.append({
+                                'nombre_ruta': " -> ".join([abreviar(x) for x in camino_actual[1:]]),
+                                'cantidad_museos': len(camino_actual) - 1,
+                                'secuencia': ruta_definitiva, 'vehiculos_usados': lista_modos, 'dinero_gastado': costo_total_evaluado,
+                                'minutos_gastados': tiempo_total_evaluado, 'geometrias': trazos_definitivos, 'museos_objetivo': self.lista_museos
+                            })
+                        else:
+                            if not museos_faltantes:
+                                registro_final.append(f"└─ TOTALES: {costo_total_evaluado:.1f} Bs | {tiempo_total_evaluado:.1f} min | ✘ DESCARTADA")
+                                self.progreso_senal.emit("\n".join(registro_final))
 
-class HiloAnimacion(QThread):
-    actualizar_posicion = pyqtSignal(float, float, str)
-    tick_tiempo = pyqtSignal(float)
-    tramo_terminado = pyqtSignal(str)
+                if not museos_faltantes:
+                    return
 
-    def __init__(self, ruta_detalles, vel_auto_kmh, vel_pie_kmh, multiplicador):
+                for siguiente_museo in museos_faltantes:
+                    origen_tramo = camino_actual[-1]
+                    destino_tramo = siguiente_museo
+                    coord_origen_tramo, coord_destino_tramo = coordenadas[origen_tramo], coordenadas[destino_tramo]
+                    distancia_recta = calcular_distancia_directa(coord_origen_tramo, coord_destino_tramo)
+                    
+                    opciones_transporte = []
+                    if modo_fijo == 'Pie': opciones_transporte.append('Pie')
+                    elif modo_fijo == 'Auto': opciones_transporte.append('Auto')
+                    elif modo_fijo == 'Micro':
+                        if origen_tramo in MATRIZ_TRANSPORTE and destino_tramo in MATRIZ_TRANSPORTE[origen_tramo] and MATRIZ_TRANSPORTE[origen_tramo][destino_tramo]['costo_pasaje'] < float('inf'):
+                            opciones_transporte.append('Micro')
+
+                    for tipo_transporte in opciones_transporte:
+                        nuevos_segmentos, costo_tramo, tiempo_tramo, distancia_km, texto_modo = calcular_segmento(origen_tramo, destino_tramo, coord_origen_tramo, coord_destino_tramo, tipo_transporte, distancia_recta)
+
+                        costo_calculado = gasto_acumulado + ENTRADAS[destino_tramo] + costo_tramo
+                        tiempo_calculado = reloj_acumulado + self.duracion_visita + tiempo_tramo
+                        
+                        linea_texto = f"|  -> {abreviar(destino_tramo):<15} | {distancia_km:>6.2f} km | {tiempo_tramo:>5.1f} min | {texto_modo} ({costo_tramo:.1f} Bs)"
+                        trazos_combinados = trazos_ruta + nuevos_segmentos
+                        
+                        sobrantes = [m for m in museos_faltantes if m != siguiente_museo]
+                        explorar_opciones(camino_actual + [siguiente_museo], sobrantes, costo_calculado, tiempo_calculado, trazos_combinados, lineas_registro + [linea_texto], modo_fijo)
+
+            if self.permitir_pie:
+                explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Pie')
+            if self.permitir_taxi:
+                explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Auto')
+            if self.permitir_micro:
+                explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Micro')
+                
+            if rutas_encontradas:
+                max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
+                rutas_encontradas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+                rutas_encontradas.sort(key=lambda x: (x['dinero_gastado'], x['minutos_gastados']))
+                
+            self.finalizado_senal.emit(rutas_encontradas)
+        except Exception as error_capturado:
+            self.error_senal.emit(str(error_capturado))
+
+class AnimadorMovimiento(QThread):
+    senal_coordenada = pyqtSignal(float, float, str)
+    senal_reloj = pyqtSignal(float)
+    senal_llegada = pyqtSignal(str)
+
+    def __init__(self, lista_geometrias, kmh_auto, kmh_pie, multiplicador_velocidad):
         super().__init__()
-        self.detalles_ruta = ruta_detalles
-        self.vel_auto_ms = (vel_auto_kmh * 1000) / 3600.0
-        self.vel_pie_ms = (vel_pie_kmh * 1000) / 3600.0
-        self.multiplicador = multiplicador
-        self.esta_corriendo = True
-        self.fps = 30
+        self.trazos = lista_geometrias
+        self.velocidad_metros_auto = (kmh_auto * 1000) / 3600.0
+        self.velocidad_metros_pie = (kmh_pie * 1000) / 3600.0
+        self.multiplicador = multiplicador_velocidad
+        self.activo = True
+        self.cuadros_por_segundo = 30
+        
     def run(self):
-        for tramo in self.detalles_ruta:
-            if not self.esta_corriendo: break
-            geom = tramo['geometria']
-            modo = tramo['modo']
-            destino = tramo['destino']
-            speed_ms = self.vel_auto_ms if modo == 'Auto' else self.vel_pie_ms
-            for i in range(len(geom) - 1):
-                if not self.esta_corriendo: break
-                p1, p2 = geom[i], geom[i+1]
-                dist_meters = calcular_distancia_haversine(p1, p2) * 1000.0
-                if dist_meters == 0: continue
-                tiempo_real_seg = dist_meters / speed_ms
-                simulated_time_sec = tiempo_real_seg / self.multiplicador
-                cuadros = max(1, int(simulated_time_sec * self.fps))
-                dlat = (p2[0] - p1[0]) / cuadros
-                dlon = (p2[1] - p1[1]) / cuadros
-                min_simulados_por_cuadro = (tiempo_real_seg / 60.0) / cuadros
-                for f in range(cuadros):
-                    if not self.esta_corriendo: break
-                    lat_actual = p1[0] + dlat * f
-                    lon_actual = p1[1] + dlon * f
-                    self.actualizar_posicion.emit(lat_actual, lon_actual, modo)
-                    self.tick_tiempo.emit(min_simulados_por_cuadro)
-                    time.sleep(1.0 / self.fps)
-            if self.esta_corriendo:
-                self.actualizar_posicion.emit(geom[-1][0], geom[-1][1], modo)
-                self.tramo_terminado.emit(destino)
-                self.esta_corriendo = False 
+        for segmento in self.trazos:
+            if not self.activo: break
+            puntos_gps = segmento['geometria']
+            tipo_movimiento = segmento['modo']
+            destino_nombre = segmento['destino']
+            
+            if tipo_movimiento == 'Micro':
+                metros_por_segundo = (20.0 * 1000) / 3600.0
+            else:
+                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
+                
+            for indice in range(len(puntos_gps) - 1):
+                if not self.activo: break
+                punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
+                metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
+                if metros_distancia == 0: continue
+                segundos_reales = metros_distancia / metros_por_segundo
+                segundos_animacion = segundos_reales / self.multiplicador
+                cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
+                salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
+                salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
+                minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
+                for frame in range(cantidad_frames):
+                    if not self.activo: break
+                    latitud_dibujada = punto_a[0] + salto_latitud * frame
+                    longitud_dibujada = punto_a[1] + salto_longitud * frame
+                    self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
+                    self.senal_reloj.emit(minutos_reloj_simulado)
+                    time.sleep(1.0 / self.cuadros_por_segundo)
+            if self.activo:
+                self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
+                self.senal_llegada.emit(destino_nombre)
+                self.activo = False 
 
-class HiloVisita(QThread):
-    tick_tiempo = pyqtSignal(float)
-    visita_terminada = pyqtSignal()
-    def __init__(self, t_museo_minutos, multiplicador):
+class ControladorTurista(QThread):
+    senal_reloj = pyqtSignal(float)
+    senal_salida = pyqtSignal()
+    def __init__(self, minutos_reales, multiplicador_velocidad):
         super().__init__()
-        self.t_museo_minutos = t_museo_minutos
-        self.multiplicador = multiplicador
-        self.fps = 10
+        self.minutos_reales = minutos_reales
+        self.multiplicador = multiplicador_velocidad
+        self.cuadros_por_segundo = 10
     def run(self):
-        tiempo_real_seg = (self.t_museo_minutos * 60) / self.multiplicador
-        cuadros = max(1, int(tiempo_real_seg * self.fps))
-        min_simulados_por_cuadro = self.t_museo_minutos / cuadros
-        for f in range(cuadros):
-            self.tick_tiempo.emit(min_simulados_por_cuadro)
-            time.sleep(1.0 / self.fps)
-        self.visita_terminada.emit()
+        segundos_animacion = (self.minutos_reales * 60) / self.multiplicador
+        cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
+        minutos_reloj_simulado = self.minutos_reales / cantidad_frames
+        for frame in range(cantidad_frames):
+            self.senal_reloj.emit(minutos_reloj_simulado)
+            time.sleep(1.0 / self.cuadros_por_segundo)
+        self.senal_salida.emit()
 
 class AgenteTransporte:
-    def __init__(self, log_widget, vista_web, restar_dinero_cb, tick_tiempo_cb):
-        self.log_widget = log_widget
-        self.vista_web = vista_web
-        self.restar_dinero_cb = restar_dinero_cb
-        self.tick_tiempo_cb = tick_tiempo_cb
+    def __init__(self, consola_ui, web_ui, funcion_dinero, funcion_tiempo):
+        self.consola = consola_ui
+        self.visor_mapa = web_ui
+        self.restar_plata = funcion_dinero
+        self.restar_reloj = funcion_tiempo
         self.ruta_actual = None
-        self.paso_actual = 0
-        self.hilo_animacion = None
-        self.costo_por_km_auto = 2.0
-    def log(self, mensaje):
-        self.log_widget.append(f"[Agente Transporte] {mensaje}")
-    def iniciar_ruta(self, ruta_info, velocidad_auto, velocidad_pie, multiplicador, on_llegada):
-        if self.hilo_animacion and self.hilo_animacion.isRunning():
-            self.hilo_animacion.esta_corriendo = False
-            self.hilo_animacion.wait()
-        self.ruta_actual = ruta_info
-        self.paso_actual = 0
-        self.on_llegada_callback = on_llegada
-        self.vista_web.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
-        self.log(f"¡Iniciando simulación! (Multiplicador x{multiplicador})")
-        self.ejecutar_siguiente_paso(velocidad_auto, velocidad_pie, multiplicador)
-    def ejecutar_siguiente_paso(self, velocidad_auto=None, velocidad_pie=None, multiplicador=None):
-        if self.ruta_actual and self.paso_actual < len(self.ruta_actual['detalles_ruta']):
-            tramo = self.ruta_actual['detalles_ruta'][self.paso_actual]
-            self.log(f"Viajando hacia {tramo['destino']} en {tramo['modo']} ({tramo['distancia']:.2f} km)...")
-            if tramo['modo'] == 'Auto':
-                costo_viaje = tramo['distancia'] * self.costo_por_km_auto
-                self.restar_dinero_cb(costo_viaje, f"Taxi a {tramo['destino']}")
-            color_recorrido = "red"
-            estilo_linea = "true" if tramo['modo'] == 'Pie' else "false"
-            self.vista_web.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_recorrido}', {estilo_linea});")
-            self.hilo_animacion = HiloAnimacion([tramo], velocidad_auto, velocidad_pie, multiplicador)
-            self.hilo_animacion.actualizar_posicion.connect(self.actualizar_marcador)
-            self.hilo_animacion.tick_tiempo.connect(self.tick_tiempo_cb)
-            self.hilo_animacion.tramo_terminado.connect(self.procesar_llegada)
-            self.hilo_animacion.start()
-            self.velocidad_auto = velocidad_auto
-            self.velocidad_pie = velocidad_pie
-            self.multiplicador = multiplicador
+        self.indice_tramo = 0
+        self.animacion = None
+        
+    def imprimir(self, texto):
+        self.consola.append(f"[Vehículo] {texto}")
+        
+    def arrancar_motor(self, datos_ruta, velocidad_coche, velocidad_caminando, acelerador, funcion_llegada):
+        if self.animacion and self.animacion.isRunning():
+            self.animacion.activo = False
+            self.animacion.wait()
+        self.ruta_actual = datos_ruta
+        self.indice_tramo = 0
+        self.evento_llegada = funcion_llegada
+        self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
+        self.imprimir(f"Iniciando trayecto en x{acelerador}")
+        self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
+        
+    def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
+        if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
+            segmento = self.ruta_actual['geometrias'][self.indice_tramo]
+            self.imprimir(f"Avanzando a {segmento['destino']} por {segmento['modo']}")
+            
+            costo_monetario = segmento.get('costo', 0)
+            if costo_monetario > 0:
+                self.restar_plata(costo_monetario, f"boleto de {segmento['modo']}")
+                
+            color_pintura = "red"
+            if segmento['modo'] == 'Micro': color_pintura = "purple"
+            
+            es_punteada = "true" if segmento['modo'] == 'Pie' else "false"
+            self.visor_mapa.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_pintura}', {es_punteada});")
+            
+            self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
+            self.animacion.senal_coordenada.connect(self.refrescar_pantalla)
+            self.animacion.senal_reloj.connect(self.restar_reloj)
+            self.animacion.senal_llegada.connect(self.aterrizaje)
+            self.animacion.start()
+            self.velocidad_coche = velocidad_coche
+            self.velocidad_caminando = velocidad_caminando
+            self.acelerador = acelerador
         else:
-            self.log("¡Ruta finalizada con éxito!")
+            self.imprimir("Destino final alcanzado.")
 
-    def actualizar_marcador(self, lat, lon, modo):
-        color = 'red' if modo == 'Auto' else 'orange'
-        self.vista_web.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({lat}, {lon}, '{color}');")
+    def refrescar_pantalla(self, latitud, longitud, transporte):
+        color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
+        self.visor_mapa.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({latitud}, {longitud}, '{color_icono}');")
 
-    def procesar_llegada(self, destino):
-        self.log(f"Llegada confirmada a {destino}.")
-        self.paso_actual += 1
-        self.on_llegada_callback(destino, lambda: self.ejecutar_siguiente_paso(self.velocidad_auto, self.velocidad_pie, self.multiplicador))
+    def aterrizaje(self, nombre_destino):
+        self.imprimir(f"Vehículo aparcado en {nombre_destino}.")
+        self.indice_tramo += 1
+        self.evento_llegada(nombre_destino, lambda: self.siguiente_movimiento(self.velocidad_coche, self.velocidad_caminando, self.acelerador))
 
-class AgenteGuiaLocal:
-    def __init__(self, parent, reloj_cb, dinero_cb, t_museo):
-        self.parent = parent
-        self.reloj_cb = reloj_cb 
-        self.dinero_cb = dinero_cb
-        self.t_museo = t_museo
-        self.hilo_visita = None
+class AgenteGuia:
+    def __init__(self, ui_principal, funcion_reloj, funcion_plata, minutos_visita):
+        self.interfaz = ui_principal
+        self.restar_reloj = funcion_reloj 
+        self.restar_plata = funcion_plata
+        self.minutos_visita = minutos_visita
+        self.animacion = None
 
-    def procesar_llegada(self, museo, callback_continuar):
-        if museo == 'Origen':
-            msg = QMessageBox(self.parent)
-            msg.setWindowTitle("Fin del Recorrido")
-            msg.setText("¡Has llegado de vuelta a casa!\nEl recorrido ha finalizado con éxito.")
-            msg.setIcon(QMessageBox.Information)
-            msg.addButton("Finalizar", QMessageBox.AcceptRole)
-            msg.exec_()
-            self.parent.consola_registros.append("[Sistema] Recorrido completado exitosamente.")
-            self.parent.btn_calcular.setEnabled(True)
-            callback_continuar()
+    def aterrizaje(self, nombre_edificio, funcion_continuar):
+        if nombre_edificio == 'Origen':
+            mensaje = QMessageBox(self.interfaz)
+            mensaje.setWindowTitle("Fin")
+            mensaje.setText("¡Llegaste a casa!")
+            mensaje.setIcon(QMessageBox.Information)
+            mensaje.addButton("Aceptar", QMessageBox.AcceptRole)
+            mensaje.exec_()
+            self.interfaz.consola_registros.append("[Guía] Fin del tour.")
+            self.interfaz.boton_calcular.setEnabled(True)
+            funcion_continuar()
             return
 
-        costo_entrada = ENTRADAS.get(museo, 0)
-        msg = QMessageBox(self.parent)
-        msg.setWindowTitle("Agente Guía")
-        msg.setText(f"¡Llegaste al {museo}!\n¿Confirmas la visita de {self.t_museo} min?")
-        msg.setIcon(QMessageBox.Question)
-        msg.addButton("Ingresar", QMessageBox.AcceptRole)
-        msg.exec_()
-        self.dinero_cb(costo_entrada, f"Entrada a {museo}")
-        self.parent.consola_registros.append(f"[Agente Guía] Iniciando recorrido dentro de {museo}...")
-        multi = int(self.parent.combo_multi.currentText().replace("x", ""))
-        self.hilo_visita = HiloVisita(self.t_museo, multi)
-        self.hilo_visita.tick_tiempo.connect(self.parent.descontar_tiempo_tick)
-        def on_visit_done():
-            self.parent.consola_registros.append(f"[Agente Guía] Visita concluida en {museo}.")
-            nombre_js = museo.replace("'", "\\'")
-            self.parent.vista_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_js}', 'green');")
-            callback_continuar()
-        self.hilo_visita.visita_terminada.connect(on_visit_done)
-        self.hilo_visita.start()
+        precio_boleto = ENTRADAS.get(nombre_edificio, 0)
+        mensaje = QMessageBox(self.interfaz)
+        mensaje.setWindowTitle("Museo")
+        mensaje.setText(f"Visitar {nombre_edificio}?")
+        mensaje.setIcon(QMessageBox.Question)
+        mensaje.addButton("Entrar", QMessageBox.AcceptRole)
+        mensaje.exec_()
+        if precio_boleto > 0:
+            self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
+        self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
+        multiplicador_aceleracion = int(self.interfaz.combo_acelerador.currentText().replace("x", ""))
+        self.animacion = ControladorTurista(self.minutos_visita, multiplicador_aceleracion)
+        self.animacion.senal_reloj.connect(self.interfaz.restar_minutos)
+        
+        def al_salir():
+            self.interfaz.consola_registros.append(f"[Guía] Saliendo de {nombre_edificio}.")
+            nombre_limpio = nombre_edificio.replace("'", "\\'")
+            self.interfaz.visor_web.page().runJavaScript(f"if(window.updateMuseumMarker) updateMuseumMarker('{nombre_limpio}', 'green');")
+            funcion_continuar()
+            
+        self.animacion.senal_salida.connect(al_salir)
+        self.animacion.start()
