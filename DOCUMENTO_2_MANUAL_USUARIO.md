@@ -393,7 +393,28 @@ class AgenteBuscador(QThread):
 La simulación de autobuses de transporte público masivo reviste de un desafío particular superior al del transporte libre de un taxi. El transporte público carece de recojo de puerta a puerta y requiere aproximarse obligatoriamente a intersecciones que formen parte integral de sus recorridos.
 
 **De dónde lo conseguimos y cómo se instaló:**
-Desarrollamos un subsistema `setup_trufis.py` encargado de descargar un archivo georreferenciado cartográfico en formato abierto (`rutas_trufis.geojson`) proveniente de una base de datos pública del mapeo del transporte de Cochabamba (2.2 Megabytes de polígonos y líneas vehiculares).
+Las rutas del transporte público no se calcularon de forma dinámica, sino que fueron importadas desde un repositorio abierto de la comunidad de desarrolladores en **GitHub**. Específicamente, extrajimos los datos cartográficos consolidados y documentados por el ingeniero boliviano **Mauricio Foronda (mauforonda)**, quien recolectó el mapeo del transporte de Cochabamba en un archivo georreferenciado público llamado `rutas_trufis.geojson`.
+Para integrar esto automáticamente, desarrollamos un subsistema `setup_trufis.py` encargado de acceder mediante el protocolo HTTP a la URL de ese repositorio en la nube y descargar el archivo de 2.2 Megabytes de polígonos y líneas vehiculares a nuestra base local.
+
+```python
+# Módulo de instalación automatizada de rutas (setup_trufis.py)
+import urllib.request
+import os
+
+def descargar_rutas():
+    archivo = "rutas_trufis.geojson"
+    if not os.path.exists(archivo):
+        print("Descargando rutas_trufis.geojson (aprox 2.2MB)...")
+        # Acceso directo al repositorio de Github de Mauricio Foronda
+        url = "https://gist.githubusercontent.com/mauforonda/b094e77a0af814dba978f6ae564faa78/raw"
+        urllib.request.urlretrieve(url, archivo)
+        print("¡Descarga completada!")
+    else:
+        print("El archivo ya existe.")
+
+if __name__ == "__main__":
+    descargar_rutas()
+```
 
 Para implementar las "paradas", el sistema ejecuta un proceso de cruce geospacial de proximidad ("Radar"). El algoritmo carga en memoria todos los puntos geométricos del recorrido de las líneas de buses existentes, y realiza un chequeo contra cada uno de los 23 recintos de museos. Si un vértice callejero del microbús colisiona con el área de cobertura del museo (fijada estrictamente en un radio menor a 400 metros de distancia), ese vértice del asfalto se categoriza internamente en la estructura de datos como una "Parada Matemática Válida" desde la cual un Peatón puede hacer interconexión intermodal hacia el museo.
 
