@@ -47,12 +47,30 @@ Para el núcleo de nuestra Inteligencia Artificial, prescindimos del uso de depe
 - Módulo de Archivos de Texto Estructurado: Implementado para la preservación de datos y la estructuración de la memoria hacia el Disco Duro, formando la base de nuestro almacenamiento temporal de alta velocidad.
 - Módulo de Tiempo y Operaciones del Sistema: El módulo de tiempo instruye al procesador lógico a suspender un subproceso, lo cual es crítico para que la simulación gráfica no se dibuje de golpe en un milisegundo, sino fotograma a fotograma; el módulo operativo nos permite explorar el sistema de carpetas local para la carga de datos geográficos.
 
-### 1.3. Instalación e Implementación de la Máquina de Enrutamiento de Código Abierto
+### 1.3. Instalación e Implementación del Enrutamiento con OpenStreetMap
 Para calcular cómo moverse por la ciudad, una Inteligencia Artificial no puede simplemente trazar una línea recta, ya que los edificios y las calles en contra ruta son obstáculos en el mundo real. 
 
-Implementamos la integración con un servidor público de enrutamiento basado en la Teoría de Grafos. Dicho servidor modela el mapa cartográfico global como un "Grafo Dirigido", donde cada intersección de la ciudad de Cochabamba es un Vértice, y cada calle es un Camino Conector que tiene un "peso" determinado (el límite de velocidad y la dirección obligatoria). Internamente, este servidor ejecuta un algoritmo modificado de "Búsqueda A-Estrella" optimizado para devolver la ruta más rápida.
+Implementamos la integración con la base de datos cartográfica mundial libre **OpenStreetMap**, específicamente consumiendo su Motor de Enrutamiento de Código Abierto. Este servidor modela el mapa cartográfico global de OpenStreetMap como un "Grafo Dirigido", donde cada intersección de la ciudad de Cochabamba es un Vértice, y cada calle es un Camino Conector que tiene un "peso" determinado (el límite de velocidad y la dirección obligatoria). Internamente, este servidor ejecuta un algoritmo modificado de "Búsqueda A-Estrella" optimizado para devolver la ruta terrestre más rápida evadiendo casas y muros.
 
-En lugar de instalar y hospedar un conjunto de computadoras locales (lo cual exigiría decenas de miles de megabytes en Memoria de Trabajo solo para procesar el país de Bolivia), nuestro equipo desarrolló una arquitectura de consumo local, comunicando a nuestra Inteligencia Artificial directamente con las puertas de acceso públicas alojadas en los servidores mundiales de la nube comunitaria.
+En lugar de instalar y hospedar un conjunto de computadoras locales (lo cual exigiría decenas de miles de megabytes en Memoria de Trabajo solo para procesar el mapa de Bolivia), nuestro equipo desarrolló una arquitectura de consumo local, comunicando a nuestra Inteligencia Artificial directamente con las puertas de acceso públicas alojadas en los servidores mundiales de la nube comunitaria de OpenStreetMap a través del siguiente conducto de red:
+
+```python
+# Conducto de red conectando con el servidor mundial de OpenStreetMap (Motor OSRM)
+url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
+
+try:
+    cabeceras = {"User-Agent": "NocheMuseosSimulador/1.0"}
+    respuesta = requests.get(url, headers=cabeceras, timeout=5)
+    datos = respuesta.json()
+    
+    if datos.get('code') == 'Ok':
+        ruta_obtenida = datos['routes'][0]
+        # Extracción de la distancia real en calles y la matemática comprimida
+        distancia_kilos = ruta_obtenida['distance'] / 1000.0
+        puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
+except Exception:
+    pass
+```
 
 ### 1.4. Mapeo Inicial: Ubicación y Digitalización de Museos
 La ubicación de los museos no es conocida con anterioridad por ningún algoritmo de Inteligencia Artificial; este es un conocimiento del dominio del problema que debe ser "inyectado".
