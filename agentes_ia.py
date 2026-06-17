@@ -70,7 +70,7 @@ class AgenteBuscador(QThread):
 
                 elif tipo_viaje == 'Micro':
                     info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
-                    id_linea = info_ruta['linea']
+                    id_linea = info_ruta['lineas_disponibles'][0]
                     ruta_fisica = LINEAS_TRUFIS.get(id_linea)
                     
                     if ruta_fisica:
@@ -196,6 +196,7 @@ class AgenteBuscador(QThread):
                             trazos_definitivos = trazos_ruta + nuevos_segmentos
                             lista_modos = [segmento['modo'] for segmento in trazos_definitivos]
                             rutas_encontradas.append({
+                                'numero_operacion': self.contador_exploracion,
                                 'nombre_ruta': " -> ".join([abreviar(x) for x in camino_actual[1:]]),
                                 'cantidad_museos': len(camino_actual) - 1,
                                 'secuencia': ruta_definitiva, 'vehiculos_usados': lista_modos, 'dinero_gastado': costo_total_evaluado,
@@ -243,10 +244,10 @@ class AgenteBuscador(QThread):
                 
             if rutas_encontradas:
                 max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
-                rutas_encontradas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
-                rutas_encontradas.sort(key=lambda x: (x['dinero_gastado'], x['minutos_gastados']))
-                
-            self.finalizado_senal.emit(rutas_encontradas)
+                rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+                self.finalizado_senal.emit(rutas_validas)
+            else:
+                self.finalizado_senal.emit([])
         except Exception as error_capturado:
             self.error_senal.emit(str(error_capturado))
 

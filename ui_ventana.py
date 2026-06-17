@@ -519,20 +519,18 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.critical(self, "Ruta Imposible", "No alcanza el dinero o el tiempo para ninguna de las opciones. Modifica tus restricciones.")
             return
             
-        max_visitados = max(r['cantidad_museos'] for r in opciones_validas)
-        opciones_filtradas = [r for r in opciones_validas if r['cantidad_museos'] == max_visitados]
-        opciones_filtradas.sort(key=lambda x: (x['dinero_gastado'], x['minutos_gastados']))
-        
         self.lista_resultados.clear()
-        for ruta in opciones_filtradas:
-            texto_lista = f"{ruta['nombre_ruta']} | Costo: {ruta['dinero_gastado']:.1f} Bs | Tiempo: {ruta['minutos_gastados']:.1f} min"
+        
+        for ruta in opciones_validas:
+            num_operacion = ruta.get('numero_operacion', '?')
+            texto_lista = f"Operación Validada #{num_operacion} ({ruta['cantidad_museos']} Museos)\n   ↳ {ruta['nombre_ruta']} | Costo: {ruta['dinero_gastado']:.1f} Bs | Tiempo: {ruta['minutos_gastados']:.1f} min"
             elemento = QListWidgetItem(texto_lista)
             elemento.setData(Qt.UserRole, ruta)
             self.lista_resultados.addItem(elemento)
             
         self.lista_resultados.setEnabled(True)
         self.boton_arrancar.setEnabled(True)
-        self.consola_registros.append(f"¡Se encontraron {len(opciones_filtradas)} opciones viables que visitan el máximo posible de {max_visitados} museos!")
+        self.consola_registros.append(f"¡Se listaron TODAS las {len(opciones_validas)} opciones viables que visitan el máximo de museos posible en el orden original!")
         self.consola_registros.append("Selecciona una ruta de la lista y presiona Iniciar.")
         
     def dibujar_ruta_previa(self):
