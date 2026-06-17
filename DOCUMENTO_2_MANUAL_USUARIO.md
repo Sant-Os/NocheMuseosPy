@@ -5,58 +5,140 @@
 
 ---
 
-## CAPÍTULO I: INSTALACIONES Y CONFIGURACIONES BÁSICAS
+## CAPÍTULO I: PREPARACIÓN DEL ENTORNO Y DATOS BASE
 
 ### Instalación de Python
-Para este proyecto decidimos usar Python 3 porque es un lenguaje fácil de entender y muy bueno para trabajar con datos y cálculos rápidos. 
-Para que el proyecto funcione sin dañar otros programas de la computadora, creamos un "Entorno Virtual". Un entorno virtual es como una caja separada donde instalamos todo lo que el proyecto necesita sin mezclarlo con el resto de la computadora.
-Se instala y activa en la consola así:
+Para el desarrollo de este proyecto decidimos usar **Python 3**. Lo elegimos porque es un lenguaje fácil de leer, excelente para el manejo de datos, y porque tiene un sistema automático que limpia la memoria de la computadora sin que nosotros tengamos que programarlo a mano. 
+
+Para que nuestro proyecto funcione correctamente y no choque con otros programas que tenga el usuario en su computadora, creamos un "Entorno Virtual de Trabajo". Un entorno virtual es una caja protectora. Dentro de esta caja, instalamos una copia aislada de Python y todas las herramientas de nuestro proyecto.
+Para instalarlo y activarlo en la computadora, abrimos la consola y escribimos:
 ```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
 ### Instalación y Ejecución de Bibliotecas Externas como Nativas
-Nuestro proyecto usa herramientas adicionales (bibliotecas) para no tener que programar todo desde cero. Las dividimos en dos tipos:
+No programamos todo desde cero. Usamos "Bibliotecas", que son paquetes de código que otras personas ya hicieron. Para este proyecto instalamos dos grupos de bibliotecas:
 
-**Bibliotecas Externas:** Son las que tuvimos que descargar de internet usando el comando `pip install`.
-- `PyQt5` y `PyQtWebEngine`: Las usamos para crear la ventana visual del programa y para poder mostrar el mapa de internet adentro de nuestra ventana.
-- `requests` y `polyline`: Sirven para conectarnos a internet a pedir rutas y para descomprimir esas rutas que llegan codificadas.
-- `folium` y `geopy`: Las usamos para dibujar las líneas y marcadores en el mapa, y para ubicar coordenadas.
+**1. Bibliotecas Externas (Se descargan de internet usando `pip install`):**
+- `PyQt5`: La usamos para crear la ventana de nuestro programa (botones, cajas de texto, etc).
+- `PyQtWebEngine`: Es un navegador de internet disfrazado de código. Nos sirve para cargar el mapa interactivo dentro de nuestra propia ventana sin abrir Google Chrome.
+- `requests`: Nos permite conectar el programa a internet para pedir rutas a servidores mundiales.
+- `polyline`: Es una herramienta matemática que descomprime la información de la ruta que nos manda internet.
+- `folium` y `geopy`: Herramientas cartográficas. Nos permiten dibujar los marcadores rojos de los museos y encontrar la latitud y longitud.
 
-**Bibliotecas Nativas:** Son las que ya vienen instaladas con Python por defecto.
-- `math`: Para hacer cálculos de distancias.
-- `itertools`: Para combinar las listas de los museos.
-- `json`: Para guardar y leer nuestros archivos de rutas guardadas.
-- `time` y `os`: Para pausar la animación de los autitos y para leer carpetas de la computadora.
+**2. Bibliotecas Nativas (Ya vienen dentro de Python, solo hay que usarlas):**
+- `math`: La usamos para fórmulas de distancia, trigonometría y divisiones matemáticas.
+- `itertools`: Para armar todas las combinaciones posibles de museos.
+- `json`: Sirve para crear y leer archivos de texto guardados en la computadora (nuestra memoria).
+- `time` y `os`: Para pausar la ejecución (así el autito del mapa se mueve poco a poco y no de golpe) y para leer carpetas de Windows.
 
-### Ubicación de todos los Museos, cómo los ingresamos en el proyecto
-Para saber dónde están los museos, buscamos manualmente las coordenadas (latitud y longitud) de los 23 museos de Cochabamba usando mapas por satélite. 
-Una vez que tuvimos todas las coordenadas, las ingresamos directamente en el código del proyecto creando un "Diccionario". Un diccionario en Python nos permite guardar el nombre del museo y sus coordenadas exactas para que el programa las encuentre al instante.
+### Ubicación de todos los museos, cómo los ingresamos en el proyecto
+Ningún programa sabe dónde están los museos por arte de magia. Nuestro equipo buscó manualmente las coordenadas de latitud y longitud de los 23 museos de Cochabamba usando mapas por satélite. 
+Para ingresar esta información a nuestro proyecto, usamos una estructura de Python llamada "Diccionario". En el archivo `configuracion.py`, programamos este diccionario. Esto es como un libro de contactos muy rápido donde el programa busca un museo y obtiene su ubicación al instante.
 
 ```python
+# Extracto del archivo configuracion.py
 MUSEOS = {
     '[A] Convento Museo Santa Teresa': (-17.389753, -66.157962),
     '[B] Museo Casa Martín Cárdenas': (-17.392648, -66.160518),
     '[C] Casona de Santiváñez': (-17.394425, -66.159162),
-    # ... (23 museos en total)
+    '[D] Museo Arqueológico UMSS': (-17.395278, -66.157394),
+    '[E] Iglesia de la Compañía de Jesús': (-17.393023, -66.157814),
+    # ... (Se ingresaron los 23 recintos culturales de Cochabamba)
 }
 ```
 
 ---
 
-## CAPÍTULO II: ARQUITECTURA DEL SISTEMA Y METRICAS
+## CAPÍTULO II: ARQUITECTURA DEL SISTEMA E INTERFAZ GRÁFICA
 
 ### Arquitectura del Sistema o Software
-La arquitectura de nuestro programa está separada en dos partes principales para que funcione mejor:
-1. **La Interfaz Visual:** Es el código que dibuja los botones, las listas y el mapa interactivo. Solo se encarga de mostrar cosas al usuario.
-2. **El Motor Lógico:** Es el código que procesa los cálculos matemáticos, las rutas y la inteligencia artificial. Funciona separado de la pantalla para que el programa no se congele mientras piensa.
+La arquitectura de nuestro programa sigue un diseño donde el "cerebro" está separado del "cuerpo". 
+Por un lado, tenemos la **Interfaz Visual**, que es todo lo que el usuario ve y toca (los botones y el mapa). Y por otro lado, está el **Motor Lógico**, que es ciego a la pantalla y solo procesa números, coordenadas y rutas. Separarlos nos permite hacer simulaciones muy pesadas sin que la ventana de la pantalla se quede colgada o "no responda".
 
-### Cómo se consigue las métricas de medida y distancia, y cómo se calcula
-Para saber la distancia real entre un museo y una parada de micro, no podemos medir una línea recta plana, porque la tierra es redonda. 
-Por eso usamos una fórmula matemática especial llamada **Fórmula de Haversine**. Esta fórmula toma las coordenadas GPS (latitud y longitud) y calcula la distancia tomando en cuenta la curva de la Tierra (usando el radio de la tierra de 6371 kilómetros). Así conseguimos la medida exacta en metros.
+### Arranque del Sistema y Configuración del Bucle Principal
+Todo sistema informático necesita un punto de inicio y un Bucle Principal (un ciclo que hace que la ventana no se cierre al instante).
+Para ejecutar nuestro simulador, creamos el archivo principal `main.py`. Aquí configuramos la pantalla para que tenga buena resolución (HD), apagamos la aceleración gráfica del mapa para evitar errores de video en algunas computadoras, e iniciamos el "Bucle Principal" (`app.exec_()`), el cual se queda esperando eternamente a que el usuario haga clic en algún botón.
 
 ```python
+# Archivo main.py (Arranque del sistema)
+import sys
+import os
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt
+from ui_ventana import VentanaPrincipal
+
+if __name__ == "__main__":
+    # Desactivamos restricciones de aceleración de gráficos para que funcione en cualquier PC
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --no-sandbox"
+    os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+    
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    aplicacion = QApplication(sys.argv)
+    
+    # Creamos la ventana y ejecutamos el Bucle Infinito del programa
+    ventana_principal = VentanaPrincipal()
+    ventana_principal.show()
+    sys.exit(aplicacion.exec_())
+```
+
+### Construcción de la Interfaz Visual con PyQt5
+Toda la pantalla de nuestro proyecto está construida usando la biblioteca PyQt5 en el archivo `ui_ventana.py`. Lo que hicimos fue crear una ventana dividida en columnas. Usamos herramientas como `QSpinBox` (para que el usuario seleccione números para el tiempo y el dinero) y `QCheckBox` (para que elija qué transportes permite).
+Además, enlazamos los botones a las acciones del código mediante la función `clicked.connect()`. Es decir, al hacer clic en "Calcular", le avisamos a la Inteligencia Artificial que empiece a buscar.
+
+```python
+# Extracto de ui_ventana.py (Creación visual de botones)
+caja_botones = QHBoxLayout()
+
+self.boton_calcular = QPushButton("Calcular")
+self.boton_calcular.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+# Conectamos el botón para que despierte al motor de búsqueda
+self.boton_calcular.clicked.connect(self.empezar_busqueda)
+
+self.boton_reiniciar = QPushButton("Reiniciar")
+self.boton_reiniciar.setStyleSheet("background-color: #F44336; color: white;")
+self.boton_reiniciar.clicked.connect(self.reiniciar_todo)
+
+caja_botones.addWidget(self.boton_calcular)
+caja_botones.addWidget(self.boton_reiniciar)
+```
+
+### Renderizado de Mapas Dinámicos en Python
+El mapa que ves a la derecha del programa no es una imagen estática. Lo construimos usando la herramienta `folium`, la cual genera un código en HTML y lo dibuja en nuestra ventana mediante el navegador interno de PyQt.
+Para hacer que el "marcador" del autito se mueva por la calle sin tener que recargar el mapa (lo que daría parpadeos molestos), inyectamos un pequeño código de **JavaScript** dentro de Python. Este código empuja las coordenadas de la calle en vivo para que el autito ruede con una animación suave.
+
+---
+
+## CAPÍTULO III: MATEMÁTICAS, MAPAS Y TRANSPORTE
+
+### Instalación, Ejecución e Implementación de OpenStreetMap
+Para saber por qué calles debe ir el auto o el peatón, no podemos trazar una línea recta porque los edificios y las casas nos estorban. 
+Por eso implementamos la base de datos libre más grande del mundo: **OpenStreetMap**. 
+La ejecución de esta herramienta funciona así: Nuestro simulador envía una petición por la red al servidor mundial de OpenStreetMap entregando las coordenadas de origen y destino. El servidor nos responde entregándonos una línea perfecta, que respeta los semáforos, el sentido de las calles y los límites de la acera para peatones.
+
+```python
+# Conexión al servidor mundial de OpenStreetMap (en configuracion.py)
+url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
+
+try:
+    respuesta = requests.get(url, headers={"User-Agent": "NocheMuseosSimulador/1.0"}, timeout=5)
+    datos = respuesta.json()
+    if datos.get('code') == 'Ok':
+        # Extracción de la distancia en kilómetros
+        distancia_kilos = datos['routes'][0]['distance'] / 1000.0
+        # polyline.decode descomprime la ruta de la calle
+        puntos_ruta = polyline.decode(datos['routes'][0]['geometry'])
+except Exception:
+    pass
+```
+
+### Cómo se consigue las métricas de medida y distancia, y cómo se calcula
+Para saber la distancia en metros de un punto "A" a un punto "B" en el mapa, no podemos medirlo plano porque la Tierra es una esfera. 
+La forma en la que calculamos esto es implementando la **Fórmula Matemática de Haversine** en nuestro código. Esta fórmula toma la latitud, la longitud y la curva de la Tierra (basada en el radio promedio de la Tierra de 6371 kilómetros). Así, nuestro programa consigue saber la distancia real que existe en la calle.
+
+```python
+# Función matemática en configuracion.py
 def calcular_distancia_directa(origen, destino):
     radio_tierra = 6371.0 # Kilómetros
     latitud_1 = math.radians(origen[0])
@@ -74,93 +156,151 @@ def calcular_distancia_directa(origen, destino):
 ```
 
 ### Instalación e Implementación de Cálculo de Tiempo por Tramo
-Una vez que calculamos cuántos metros o kilómetros hay en un tramo, calculamos el tiempo usando la regla básica de la física: Tiempo es igual a Distancia dividida entre la Velocidad. 
-El usuario elige a qué velocidad camina la persona y a qué velocidad va el auto. Luego el sistema divide los kilómetros del tramo entre esa velocidad para saber exactamente cuántos minutos tardará el viaje.
-
----
-
-## CAPÍTULO III: MAPAS Y RUTAS DE TRANSPORTE
-
-### Instalación, Ejecución e Implementación de OpenStreetMap
-Para saber por qué calles debe ir el auto o la persona caminando, implementamos la base de datos libre **OpenStreetMap**. 
-OpenStreetMap funciona como un servidor en internet que tiene registradas todas las calles, direcciones y si una calle es de sentido único. Nuestro proyecto se conecta por internet a este servidor y le envía las coordenadas de inicio y fin. El servidor de OpenStreetMap nos devuelve la ruta dibujada para que el autito no atraviese casas ni vaya en contra ruta.
-
-```python
-url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-respuesta = requests.get(url, headers={"User-Agent": "NocheMuseos/1.0"}, timeout=5)
-datos = respuesta.json()
-```
+Una vez que nuestra fórmula matemática nos devuelve la distancia real, saber el tiempo es muy simple: usamos la ley física que dice que el Tiempo es igual a la Distancia dividida por la Velocidad (`t = d / v`).
+En nuestro simulador, el usuario puede seleccionar a qué velocidad caminará y a qué velocidad viajará el auto. El programa simplemente divide la distancia obtenida de OpenStreetMap entre la velocidad que seleccionó el usuario para saber con exactitud cuántos minutos durará el viaje de una calle a otra.
 
 ### Cómo calculamos todas las rutas de movimiento para autos y el peatón
-Cuando el usuario quiere ir del Museo A al Museo B en auto o caminando, el programa toma las coordenadas de ambos museos y hace una petición a OpenStreetMap pidiendo el "perfil peatón" o el "perfil auto". Si hay conexión, guardamos la lista de calles que nos da. Si la conexión falla, el programa une los dos puntos con una línea directa de emergencia usando el cálculo de distancia visto en el paso anterior.
+Cuando el usuario intenta ir del Museo A al Museo B en auto o caminando, el programa manda una alerta al servidor de OpenStreetMap solicitando el perfil de viaje. Si elegimos peatón, el servidor nos devuelve calles peatonales y parques. Si elegimos auto, nos devuelve calles para vehículos. Si la computadora no tiene internet en ese momento, el programa implementa un "plan de emergencia", dibujando una línea recta de pájaro y multiplicando la distancia por un pequeño margen de error para que la simulación no se detenga.
 
 ### Los modos de transporte, cómo los implementamos e instalamos
-En el simulador tenemos tres modos de transporte: Peatón, Auto/Taxi, y Micros/Trufis.
-- **Peatón y Auto:** Los implementamos usando el servidor de OpenStreetMap porque pueden ir desde cualquier puerta hasta cualquier otra puerta directamente.
-- **Micros/Trufis:** Es mucho más difícil porque los micros tienen líneas fijas y no te recogen en la puerta. Los implementamos leyendo un archivo lleno de rutas fijas y buscando cuál ruta pasa cerca del origen y del destino.
+El simulador incorpora tres modos principales:
+1. **Peatonal:** Implementado para poder ir caminando por las aceras de cualquier parte.
+2. **Auto / Taxi:** Implementado para pedir un taxi libre que nos lleve de puerta a puerta usando el presupuesto en Bolívianos.
+3. **Transporte Público (Micro y Trufi):** Este es diferente, porque los micros no se salen de su ruta. Lo implementamos leyendo las rutas físicas reales de Cochabamba para que el usuario pueda tomar micros en los cruces.
 
-### Rutas del transporte público y paradas, tramos y paradas (Cómo se instaló y de dónde lo conseguimos)
-Para conseguir las rutas de los micros y trufis de Cochabamba, descargamos la información libre de la ciudad en un archivo llamado `rutas_trufis.geojson`. Este archivo tiene dibujado por dónde pasa cada línea.
-Para incorporarlo al proyecto, hicimos una función que lee este archivo. Luego, para calcular las "Paradas", el sistema busca qué calles del recorrido del micro están a menos de 400 metros de distancia del museo. Así, se crea un tramo dividido en tres pasos: Caminar a la parada, viajar en el micro, y caminar de la parada al museo.
+### Rutas del transporte público y paradas (Cómo se instaló y de dónde lo conseguimos)
+Para los Micros, conseguimos un archivo de datos libres llamado `rutas_trufis.geojson` que contiene dibujadas todas las rutas del transporte público de Cochabamba.
+Lo instalamos integrándolo al archivo `configuracion.py`. Para calcular las paradas, hicimos un pequeño radar. El programa analiza todas las líneas de transporte y verifica qué calles están a una distancia menor a 400 metros de la puerta del museo. Si hay una calle cerca de la ruta del micro, la marca como una "Parada Matemática" permitiendo que el turista camine hasta ahí y suba al transporte.
+
+```python
+# Lógica del Radar de 400 metros para encontrar paradas en configuracion.py
+# Análisis para encontrar Paradas cerca del Museo
+paradas_cercanas = {nodo: set() for nodo in nodos_ciudad}
+
+for nombre_nodo, coordenada_nodo in nodos_ciudad.items():
+    for identificador_linea, ruta_linea in diccionario_lineas.items():
+        for punto_ruta in ruta_linea:
+            distancia_a_calle = calcular_distancia_directa(coordenada_nodo, punto_ruta)
+            
+            # Si el micro pasa a menos de 400 metros (0.4 km) del Museo, creamos una Parada
+            if distancia_a_calle < 0.4:
+                paradas_cercanas[nombre_nodo].add(identificador_linea)
+                break
+```
 
 ---
 
-## CAPÍTULO IV: CACHÉ, MACROOPERADORES Y BÚSQUEDA
-
-### Cómo desarrollamos e implementamos el Caché para las rutas del peatón y en taxi
-Si pedimos miles de rutas a OpenStreetMap por internet, el programa sería muy lento y nos bloquearían. Para solucionarlo, desarrollamos un "Caché" (memoria guardada).
-Lo implementamos creando dos archivos de texto en la computadora (`cache_peatonal.json` y `cache_taxi.json`). Cuando el programa necesita una ruta, primero busca en estos archivos locales. Si la ruta ya está guardada, la saca de ahí y es instantáneo. Solo se conecta a internet si la ruta es completamente nueva, y una vez que la descarga, la guarda en los archivos para el futuro.
-
-### Instalación e Implementación de Macrooperadores
-Cuando una persona viaja en micro, hace varias cosas: Camina, sube al micro, viaja, y camina al museo. Si el programa calculara esto como cosas separadas, se confundiría. 
-Implementamos un **Macrooperador**, que es una función de código que agrupa estas tres acciones separadas y las convierte en "Un solo gran movimiento matemático" con un costo total y un tiempo total fijo. 
-
-### Cómo creamos el caché para optimizar las operaciones de macrooperadores
-Como el Macrooperador de micro necesita saber cómo caminar a las paradas, usa nuestra función de memoria (Caché peatonal) que explicamos arriba. Al tener las caminatas a las paradas ya guardadas en el disco duro, el Macrooperador se arma de manera inmediata sin perder tiempo conectándose a internet, haciendo que armar el viaje en micro sea ultra rápido.
+## CAPÍTULO IV: OPTIMIZACIÓN, BÚSQUEDA Y CACHÉ
 
 ### Instalación e Implementación de Motores de Búsqueda
-Para encontrar el mejor recorrido visitando muchos museos, implementamos un Motor de Búsqueda de Inteligencia Artificial llamado **Búsqueda en Profundidad**. 
-Este motor funciona explorando una opción de camino hasta el final (Ej. Museo A -> B -> C). Si ese camino no es bueno, retrocede un paso y prueba otra combinación (A -> B -> D). Así revisa las combinaciones hasta encontrar la mejor.
+Para hallar el mejor recorrido de la "Noche de Museos", usamos Inteligencia Artificial creando un Motor de Búsqueda de **Profundidad**.
+Funciona explorando un camino por completo hasta el final (por ejemplo: Origen -> Museo A -> Museo B -> Origen). Si se da cuenta que sobró mucho dinero, la inteligencia "retrocede un paso" y se va por otra rama diferente probando (Museo A -> Museo C -> Museo B). De esta forma explora todas las posibilidades sin perderse.
 
 ### Instalación e Implementación de Poda
-Revisar todas las combinaciones posibles es muy lento. Si elegimos muchos museos, la computadora podría tardar años. Para evitar esto, implementamos la **Poda**. 
-La poda es un código que revisa en todo momento si el dinero o el tiempo gastado hasta ahora ya es mayor al que tiene el usuario. Si ya nos pasamos del límite de tiempo, la Poda corta inmediatamente ese camino y la computadora ya no sigue revisando los museos que faltaban en ese recorrido, ahorrando millones de operaciones.
+Si el usuario selecciona 10 museos, hay millones de combinaciones para recorrerlos. Sería imposible calcularlos todos a tiempo.
+Por eso implementamos la **Poda**. La Poda es una regla en el código que evalúa constantemente el viaje. Si a mitad del recorrido el costo ya es más de 100 Bolivianos, y el usuario solo tiene 50, la Poda "corta" de inmediato ese camino y aborta su revisión futura. Esto evita que la computadora pierda tiempo analizando un camino que ya de por sí no es válido.
+
+```python
+# Poda implementada en agentes_ia.py
+def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado...):
+    
+    # 1. Condición de Poda Algorítmica: Si nos pasamos de plata o tiempo, cortamos aquí mismo.
+    if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+        m = len(museos_faltantes)
+        # 2. Análisis Matemático para saber cuántos millones de caminos nos ahorramos de buscar
+        ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+        self.contador_exploracion += ramas_cortadas
+        
+        # 3. Aborto Inmediato del proceso
+        return
+```
 
 ### Instalación e Implementación de Filtrado y Despliegue de Resultados
-Después de hacer la Búsqueda y la Poda, pueden quedar varios caminos válidos. Para mostrar el mejor, implementamos un algoritmo de Filtrado. 
-El filtrado cuenta cuántos museos logró visitar cada camino válido. Luego descarta los caminos más pobres y se queda únicamente con la ruta que logró visitar la mayor cantidad de museos. Ese resultado ganador es el que se dibuja en la pantalla y en el mapa.
+Después de hacer la Búsqueda y la Poda, sobreviven varias rutas que sí alcanzan en el presupuesto de dinero y de tiempo.
+El programa las pasa por un Filtro Final. El Filtro Final cuenta cuántos museos visitó cada una de estas opciones ganadoras y elimina las más cortas. Como resultado final, solo despliega en la lista de la pantalla las opciones que visitaron la cantidad máxima absoluta de recintos culturales posibles con el dinero que tenías.
+
+### Cómo desarrollamos e implementamos el Caché para las rutas del peatón y en taxi
+Si en cada milímetro que explora el Motor de Búsqueda nos conectáramos a OpenStreetMap, demoraríamos años y nos bloquearían el internet.
+Para arreglar esto, creamos un Sistema de **Caché** (Una Memoria Guardada). El sistema crea un archivo de texto en la computadora llamado `cache_peatonal.json`. Cada vez que descubrimos una calle nueva, la escribimos en ese archivo para que nunca más la volvamos a descargar. Cuando la inteligencia busca de nuevo esa calle, va primero al Caché, lo cual es milésimas de segundo más rápido que pedirla al internet.
+
+```python
+# Sistema de Memoria Caché en configuracion.py
+def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
+    llave = f"{perfil}|{origen[0]},{origen[1]}|{destino[0]},{destino[1]}"
+    memoria_activa = memoria_peaton if perfil == 'peaton' else memoria_taxi
+    
+    # ÉXITO: La ruta ya estaba guardada en el disco local de nuestra computadora
+    if llave in memoria_activa:
+        datos = memoria_activa[llave]
+        return datos[0], datos[1], datos[2]
+        
+    # FALLO: La ruta es nueva, debemos conectarnos a OpenStreetMap
+    url = f"..."
+    # [...]
+    
+    # Compensación de Espacio y Tiempo: Guardamos lo que trajimos para el futuro
+    memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
+    guardar_memoria(perfil)
+```
+
+### Instalación e Implementación de Macrooperadores
+Cuando una persona usa un micro en la vida real, tiene que hacer tres cosas: 1) Caminar a la parada, 2) Viajar en el transporte, y 3) Caminar hasta la puerta del Museo.
+Para la computadora, hacer 3 cosas separadas confunde la inteligencia artificial. Por eso construimos e implementamos un **Macrooperador**. Un macrooperador es una función de código que junta esas 3 cosas y las empaqueta en un solo "Movimiento de Viaje". Esto hace que la computadora planifique muchísimo más rápido.
+
+```python
+# Extracto del Macrooperador en agentes_ia.py
+elif tipo_viaje == 'Micro':
+    # ... código de búsqueda de paradas
+    
+    # El Macrooperador inserta 3 acciones físicas como si fueran una sola pieza unificada
+    segmentos.extend([
+        {'origen': nodo_a, 'destino': f'Parada', 'modo': 'Pie', 'geometria': caminata_1, 'costo': 0.0},
+        {'origen': f'Parada', 'destino': f'Parada', 'modo': 'Micro', 'geometria': micro, 'costo': pasaje},
+        {'origen': f'Parada', 'destino': nodo_b, 'modo': 'Pie', 'geometria': caminata_2, 'costo': 0.0}
+    ])
+```
+
+### Cómo creamos el caché para optimizar las operaciones de macrooperadores
+El Macrooperador, al tener que combinar caminata y microbús, necesita saber las calles peatonales. Para armarse de manera ultrarrápida sin tener que ir a OpenStreetMap, le ordenamos al Macrooperador que alimente sus líneas de caminata directamente desde el Caché Peatonal (`cache_peatonal.json`) que habíamos inventado antes. Así logramos que calcular un viaje en micro tome prácticamente cero segundos.
 
 ---
 
 ## CAPÍTULO V: ARQUITECTURA MULTIAGENTE Y TAXONOMÍA
 
-En Inteligencia Artificial, un "Agente" es un pequeño programa independiente que percibe cosas y toma decisiones. Implementamos 4 tipos diferentes de agentes que trabajan juntos (Arquitectura Multiagente). Se instalaron usando "Hilos" de programación para que trabajen en paralelo.
+En Ciencias de la Computación, un Agente Inteligente es un pequeño bloque de código o "robot virtual" que toma sus propias decisiones y no depende del resto del programa. En nuestro sistema implementamos 4 Agentes trabajando en equipo.
 
-### 1. Agentes Reactivos Simples (El Agente Guía)
-Este tipo de agente solo reacciona a lo que pasa en el momento sin pensar en el futuro ni en el pasado. Su regla es "Si pasa esto, hago esto".
-**Cómo funciona en nuestro proyecto:** Es el agente que te recibe en la puerta del museo. Cuando nota que el auto llegó a un museo, su única reacción es cobrar el dinero de la entrada y hacer pasar el tiempo de la visita en el reloj.
+### Arquitectura Multiagente y Taxonomía (Los agentes explicados de forma sencilla)
+1. **Agentes Reactivos Simples (El Agente Guía):** Es un robot que solo reacciona a su presente inmediato. En nuestro proyecto, es el Guía que te espera en el museo. No sabe de dónde vienes. Su única función es reaccionar si llegas a su puerta, cobrarte el dinero de la entrada y detener el reloj durante la visita.
+2. **Agentes Reactivos Basados en Modelos (El Agente Animador Físico):** Es un robot que entiende cómo funciona la física y el movimiento en el mundo real. En el simulador, se encarga de recibir las coordenadas del GPS y dibujar cuadro por cuadro al auto deslizándose por la carretera respetando las leyes de velocidad y tiempo.
+3. **Agentes Basados en Objetivos (El Agente de Transporte):** Este robot tiene una meta clara y es capaz de coordinar los pasos para lograrla. Es el agente que dirige al animador físico y le dice qué calles tomar y cuándo detenerse, asegurándose de que la ruta final se cumpla museo tras museo sin desvíos.
+4. **Agentes Basados en Utilidad (El Agente Buscador Supremo):** El más inteligente de todos. No solo sabe llegar a la meta, sino que escoge el camino que dé más beneficio o "Utilidad". Este agente es el encargado de correr el motor de búsqueda, aplicar la poda matemática, comparar las rutas válidas y decidir cuál es la ruta que ahorra más tiempo y da mayor cantidad de museos.
 
-### 2. Agentes Reactivos Basados en Modelos (El Agente de Movimiento)
-Este agente es más avanzado porque entiende cómo funcionan las reglas físicas del mundo interior.
-**Cómo funciona en nuestro proyecto:** Es el encargado de mover el marcador del auto en el mapa. Sabe a qué velocidad va el auto, sabe cuánta distancia hay y calcula en qué coordenada del mapa debería dibujarse el auto cada segundo para simular movimiento continuo.
+### Comunicación entre Agentes y la Interfaz Gráfica
+¿Cómo puede el Agente seguir buscando rutas pesadas durante un minuto sin que la ventana de la computadora "se cuelgue"? 
+Esto lo logramos instalando "Hilos en Segundo Plano" (`QThread`). Metimos a los Agentes de Búsqueda y de Movimiento en sus propios carriles paralelos de trabajo, separados de la Interfaz Visual. Para poder comunicarse entre ellos, usan un sistema llamado "Señales" (`pyqtSignal`). Los agentes lanzan una señal, y la interfaz la recibe para actualizar el mapa y la barra de dinero sin bloquearse ni congelar la PC.
 
-### 3. Agentes Basados en Objetivos (El Agente de Transporte)
-Este agente tiene una meta clara y planifica varios pasos por adelantado para cumplirla, sin importar si los pasos cambian.
-**Cómo funciona en nuestro proyecto:** Es el agente que tiene toda la ruta ganadora. Sabe que tiene que ir por varios museos. Le da órdenes al Agente de Movimiento para avanzar al primer museo, espera a que termine, y luego sigue con el siguiente museo hasta cumplir la ruta completa.
-
-### 4. Agentes Basados en Utilidad (El Agente Buscador Supremo)
-Este es el agente más inteligente. Sabe que hay muchas formas de lograr la meta, pero busca la que dé mayor felicidad o puntaje útil.
-**Cómo funciona en nuestro proyecto:** Es el que ejecuta el Motor de Búsqueda y la Poda. Revisa todos los caminos posibles y le da más "puntaje" a la ruta que visita más museos gastando menos tiempo y dinero.
+```python
+# Instalación de Señales e Hilos (agentes_ia.py)
+class AgenteBuscador(QThread):
+    # Declaración de las Señales (Cables de comunicación a la pantalla principal)
+    progreso_senal = pyqtSignal(str)
+    finalizado_senal = pyqtSignal(list)
+    
+    def run(self):
+        # ... El agente de IA realiza su búsqueda matemática gigante y luego emite los resultados ...
+        self.finalizado_senal.emit(rutas_validas)
+```
 
 ---
 
 ## CAPÍTULO VI: MANUAL OPERATIVO COMPLETO PARA EL USUARIO DEL SIMULADOR
 
-Para utilizar el software "Noche de Museos Cochabamba", siga estos pasos:
+Para utilizar y maniobrar el software "Noche de Museos Cochabamba", siga cuidadosamente estos pasos de control:
 
-1. **Definir el Origen y Recursos:** En la parte izquierda de la pantalla, ingrese el Presupuesto (en dinero) y el Tiempo libre (en minutos) que tiene para todo el recorrido de la noche.
-2. **Definir las Velocidades:** En la misma columna, escriba a qué velocidad caminará y a qué velocidad viaja en auto. Elija también un "Acelerador" (Ej. x10) para que la animación del auto en el mapa sea rápida y no tenga que esperar tiempo real.
-3. **Seleccionar los Museos:** Marque con un visto bueno las casillas de los museos que le gustaría visitar. Puede seleccionar desde 2 hasta más de 10 museos.
-4. **Calcular la Ruta:** Presione el botón azul "Calcular". El sistema mostrará en la caja de texto negra debajo cómo el algoritmo va "Podando" las rutas que son muy caras o tardan mucho.
-5. **Iniciar el Recorrido Visual:** Si la computadora encuentra una ruta exitosa, el botón verde "Iniciar" se habilitará. Presiónelo para ver cómo el marcador se mueve por las calles de Cochabamba en el mapa interactivo de la derecha, visitando cada museo paso a paso.
-6. **Ver el Resultado:** Podrá ver las líneas rojas (viaje en auto), líneas punteadas (caminata) o líneas moradas (viaje en micro) dibujadas en el mapa, mientras los indicadores de arriba le muestran el dinero y tiempo restante.
+1. **Definir el Origen y Recursos:** En la parte izquierda de la pantalla, encontrará la sección "Origen y Presupuesto". Escriba su ubicación inicial o haga Clic en cualquier parte del mapa visual. Debajo, ingrese el Presupuesto (Dinero en Bolivianos) y el Tiempo libre (En minutos) que tiene para todo el recorrido en la noche.
+2. **Definir las Velocidades:** En el panel "Simulación", escriba a qué velocidad de kilómetros por hora caminará usted y a qué velocidad viaja en auto. Elija también un nivel en el botón "Acelerar Simulación" (Ej. x10 o x20) para que la animación del auto en el mapa sea rápida y su vista se sienta fluida.
+3. **Restricciones de Transporte:** Si no desea ir en algún medio de transporte, puede desmarcar las casillas "Pie, Taxi, Micro" para que el buscador ignore ese modo de viaje.
+4. **Seleccionar los Museos de Interés:** Marque con un "Visto Bueno" las casillas de los museos de la lista que usted tiene planeado visitar. Puede seleccionar desde 2 hasta todos los museos de la ciudad.
+5. **Generar Cálculo Inteligente:** Presione el botón azul "Calcular". El sistema mostrará en la consola de texto oscura cómo la inteligencia se conecta a OpenStreetMap, explora la ciudad, "Poda" las rutas que exceden sus límites y analiza todo en tiempo récord.
+6. **Iniciar el Recorrido Visual en Mapa:** Si la computadora encuentra alternativas exitosas, las colocará en la pequeña lista de abajo y se habilitará el botón verde "Iniciar". 
+   Seleccione una ruta de la lista y haga clic en **Iniciar** para observar en tiempo real cómo el marcador virtual se desliza calle por calle en el mapa derecho, visitando cada museo paso a paso, dibujando líneas de color rojo (Auto), punteadas (A Pie) o moradas (Micros) mientras la cantidad de dinero y tiempo bajan en vivo en el sistema de caja registradora de la parte superior.
