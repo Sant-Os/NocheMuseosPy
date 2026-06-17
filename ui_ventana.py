@@ -11,6 +11,7 @@ from PyQt5.QtCore import QUrl, pyqtSignal, Qt, QUrlQuery
 from geopy.geocoders import Nominatim
 from configuracion import MUSEOS
 from agentes_ia import AgenteTransporte, AgenteGuia, AgenteBuscador
+from grafo_visual import VentanaGrafo
 
 class InterfazMapaWeb(QWebEnginePage):
     clic_mapa_senal = pyqtSignal(float, float)
@@ -158,7 +159,14 @@ class VentanaPrincipal(QMainWindow):
         self.boton_calcular.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
         self.boton_calcular.clicked.connect(self.empezar_busqueda)
         caja_botones.addWidget(self.boton_calcular)
-        
+
+        self.boton_grafo = QPushButton("Ver Grafo")
+        self.boton_grafo.setStyleSheet(
+            "background-color: #9C27B0; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;"
+        )
+        self.boton_grafo.clicked.connect(self.mostrar_grafo_visual)
+        caja_botones.addWidget(self.boton_grafo)
+
         self.boton_reiniciar = QPushButton("Reiniciar")
         self.boton_reiniciar.setStyleSheet("background-color: #F44336; color: white; font-weight: bold; padding: 4px 15px; font-size: 13px;")
         self.boton_reiniciar.clicked.connect(self.reiniciar_todo)
@@ -529,6 +537,7 @@ class VentanaPrincipal(QMainWindow):
             self.lista_resultados.addItem(elemento)
             
         self.lista_resultados.setEnabled(True)
+        self.ultima_ruta = opciones_validas[0]
         self.boton_arrancar.setEnabled(True)
         self.consola_registros.append(f"¡Se listaron TODAS las {len(opciones_validas)} opciones viables que visitan el máximo de museos posible en el orden original!")
         self.consola_registros.append("Selecciona una ruta de la lista y presiona Iniciar.")
@@ -538,29 +547,72 @@ class VentanaPrincipal(QMainWindow):
         if not elemento_seleccionado: return
         datos_ruta_optima = elemento_seleccionado.data(Qt.UserRole)
         self.dibujar_mapa(datos_ruta_optima)
-        
+
+    def mostrar_grafo_visual(self):
+        elemento = self.lista_resultados.currentItem()
+
+        if not elemento:
+             QMessageBox.warning(self, "Aviso", "Selecciona una ruta primero")
+             return
+
+        datos_ruta_optima = elemento.data(Qt.UserRole)
+        print("\n===== DEBUG GRAFO =====")
+        print("Tipo:", type(datos_ruta_optima))
+        print("Claves:", datos_ruta_optima.keys() if isinstance(datos_ruta_optima, dict) else "NO ES DICCIONARIO")
+        print("Tramos:", len(datos_ruta_optima.get("geometrias", [])))
+        print("======================\n")
+
+        from grafo_visual import VentanaGrafo
+
+        self.ventana_grafo = VentanaGrafo(datos_ruta_optima)
+        self.ventana_grafo.show()
+    
+
     def iniciar_simulacion(self):
         elemento_seleccionado = self.lista_resultados.currentItem()
-        if not elemento_seleccionado: return
+
+        if not elemento_seleccionado:
+            return
+
         datos_ruta_optima = elemento_seleccionado.data(Qt.UserRole)
+
         self.boton_calcular.setEnabled(False)
         self.boton_arrancar.setEnabled(False)
         self.lista_resultados.setEnabled(False)
-        self.consola_registros.append(f"\nOpción seleccionada: {datos_ruta_optima['nombre_ruta']}")
+
+        self.consola_registros.append(
+            f"\nOpción seleccionada: {datos_ruta_optima['nombre_ruta']}"
+    )
+
         vehiculos_str = " -> ".join(datos_ruta_optima['vehiculos_usados'])
-        self.consola_registros.append(f"Modos de Transporte elegidos: {vehiculos_str}")
+        self.consola_registros.append(
+            f"Modos de Transporte elegidos: {vehiculos_str}"
+    )
+
         self.dibujar_mapa(datos_ruta_optima)
-        self.guia = AgenteGuia(self, self.restar_minutos, self.restar_plata, self.selector_vmuseo.value())
-        acelerador = int(self.combo_acelerador.currentText().replace("x", ""))
-        self.consola_registros.append("\n--- INICIANDO SIMULACIÓN ANIMADA ---")
+
+        self.guia = AgenteGuia(
+            self,
+            self.restar_minutos,
+            self.restar_plata,
+            self.selector_vmuseo.value()
+    )
+
+        acelerador = int(
+            self.combo_acelerador.currentText().replace("x", "")
+    )
+
+        self.consola_registros.append(
+            "\n--- INICIANDO SIMULACIÓN ANIMADA ---"
+    )
+
         self.transporte.arrancar_motor(
-            datos_ruta_optima, 
-            self.selector_vauto.value(), 
-            self.selector_vpie.value(), 
+            datos_ruta_optima,
+            self.selector_vauto.value(),
+            self.selector_vpie.value(),
             acelerador,
             self.guia.aterrizaje
-        )
-
+    )
     def restar_plata(self, cantidad, motivo):
         if cantidad > 0:
             self.presupuesto_disponible -= cantidad
@@ -570,3 +622,4 @@ class VentanaPrincipal(QMainWindow):
     def restar_minutos(self, reduccion):
         self.tiempo_disponible -= reduccion
         self.etiqueta_tiempo.setText(f"Tiempo: {self.tiempo_disponible:.1f} min")
+
