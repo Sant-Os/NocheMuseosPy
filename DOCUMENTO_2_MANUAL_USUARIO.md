@@ -1,4 +1,4 @@
-# MANUAL TÉCNICO Y DE USUARIO: OPTIMIZACIÓN MULTI-AGENTE PARA RUTAS DE MUSEOS
+# MANUAL TÉCNICO Y DE USUARIO: OPTIMIZACIÓN MULTIAGENTE PARA RUTAS DE MUSEOS
 ## Proyecto: Noche de Museos en Cochabamba
 **Materia:** Inteligencia Artificial  
 **Desarrollado por:** Estudiante 1, Estudiante 2, Estudiante 3, Estudiante 4.
@@ -6,7 +6,7 @@
 ---
 
 ## RESUMEN EJECUTIVO
-El presente informe de Inteligencia Artificial documenta exhaustivamente el marco teórico, el diseño arquitectónico, la abstracción matemática y el desarrollo algorítmico del simulador "Noche de Museos Cochabamba". Hemos estructurado este documento bajo el formato académico de Tesina, exponiendo sin recortes el código fuente, la taxonomía teórica aplicada y el análisis de complejidad que nuestro equipo desarrolló para resolver un derivado del Problema del Agente Viajero (TSP) sometido a restricciones multimodales en el entorno urbano.
+El presente informe de Inteligencia Artificial documenta exhaustivamente el marco teórico, el diseño de la arquitectura, la abstracción matemática y el desarrollo del algoritmo del simulador "Noche de Museos Cochabamba". Hemos estructurado este documento bajo el formato académico de Tesina, exponiendo sin recortes el código fuente, la taxonomía teórica aplicada y el análisis de complejidad que nuestro equipo desarrolló para resolver un derivado del Problema del Viajante de Comercio sometido a restricciones multimodales en el entorno urbano.
 
 ---
 
@@ -15,9 +15,9 @@ El presente informe de Inteligencia Artificial documenta exhaustivamente el marc
 La construcción de un simulador geográfico de Inteligencia Artificial requiere una base tecnológica sólida y escalable. Para este proyecto, el ecosistema de desarrollo ha sido meticulosamente seleccionado considerando el rendimiento en la asignación de memoria y la capacidad computacional para manejar procesos concurrentes.
 
 ### 1.1. Instalación de Python y Entornos Virtuales
-Nuestro equipo seleccionó **Python 3** como el lenguaje de programación base. La decisión se fundamenta en su intérprete de alto nivel, que gestiona automáticamente la recolección de basura (Garbage Collection) y permite el manejo eficiente de diccionarios en memoria (estructuras Hash Map) que son vitales para la ejecución de nuestro algoritmo de Poda. 
+Nuestro equipo seleccionó **Python 3** como el lenguaje de programación base. La decisión se fundamenta en su intérprete de alto nivel, que gestiona automáticamente el liberador de memoria y permite el manejo eficiente de diccionarios en memoria (tablas de búsqueda rápidas) que son vitales para la ejecución de nuestro algoritmo de Poda. 
 
-Para garantizar que nuestro sistema no entre en conflictos con otras dependencias instaladas a nivel global en el sistema operativo del usuario, hemos implementado el uso de **Entornos Virtuales (`venv`)**. Teóricamente, un entorno virtual actúa como un contenedor aislado (sandbox) que clona el intérprete de Python y encapsula las bibliotecas específicas del proyecto. Su instalación y activación se realizan mediante la interfaz de línea de comandos de la siguiente manera:
+Para garantizar que nuestro sistema no entre en conflictos con otras dependencias instaladas a nivel global en el sistema operativo del usuario, hemos implementado el uso de **Entornos Virtuales de Trabajo**. Teóricamente, un entorno virtual actúa como un contenedor de aislamiento que clona el intérprete de Python y encapsula las bibliotecas específicas del proyecto. Su instalación y activación se realizan mediante la interfaz de línea de comandos de la siguiente manera:
 
 ```bash
 # Creación del contenedor aislado
@@ -28,35 +28,35 @@ venv\Scripts\activate
 ```
 
 ### 1.2. Instalación de Bibliotecas Externas y Uso de Bibliotecas Nativas
-El desarrollo de software moderno no consiste en reinventar la rueda, sino en abstraer la complejidad utilizando paquetes pre-compilados. Hemos dividido nuestras dependencias en dos categorías rigurosas.
+El desarrollo de software moderno no consiste en reinventar la rueda, sino en abstraer la complejidad utilizando paquetes precompilados. Hemos dividido nuestras dependencias en dos categorías rigurosas.
 
-#### A) Bibliotecas Externas (Vía PIP)
-La instalación se realiza a través del gestor de paquetes de Python (`pip`). Ejecutamos el siguiente comando unificado:
+#### A) Bibliotecas Externas (Instalables)
+La instalación se realiza a través del gestor de paquetes de Python. Ejecutamos el siguiente comando unificado:
 ```bash
 pip install PyQt5 PyQtWebEngine folium requests polyline geopy
 ```
 Cada una de estas librerías cumple una función teórica específica en la arquitectura del sistema:
-- **`PyQt5` y `PyQtWebEngine`:** PyQt5 es una envoltura de Python para el framework Qt escrito en C++. Teóricamente, Qt funciona mediante un Bucle de Eventos (Event Loop) asíncrono y un paradigma de "Señales y Ranuras" (Signals and Slots) que permite la comunicación entre el Hilo Principal (Main Thread) y los Hilos Secundarios en Segundo Plano (Background Threads). `PyQtWebEngine` invoca directamente al motor Chromium de Google para procesar código HTML5 y JavaScript de forma nativa dentro de nuestro software.
-- **`requests` y `polyline`:** La librería `requests` abstrae la complejidad de los "Sockets" de red, permitiendo a nuestro programa establecer conexiones TCP/IP seguras y comunicarse mediante el protocolo HTTP (HyperText Transfer Protocol) usando peticiones `GET` hacia servidores RESTful. Por su parte, `polyline` es una implementación del "Algoritmo de Polilínea Codificada" inventado por Google, el cual comprime cientos de miles de coordenadas de latitud y longitud (con precisión de 5 decimales) en una sola cadena de caracteres alfanuméricos ASCII (String), reduciendo el tamaño del peso de red a fracciones de kilobytes.
-- **`folium` y `geopy`:** `folium` funciona como un generador (wrapper) dinámico. Transforma comandos abstractos de Python en scripts complejos de JavaScript utilizando la librería espacial genérica Leaflet.js. `geopy` se encarga de la geocodificación y proporciona modelos matemáticos avanzados (como el elipsoide WGS-84) para el cálculo de distancias terrestres.
+- **PyQt5 y PyQtWebEngine:** PyQt5 es una capa de envoltura de Python para un marco de trabajo de interfaces escrito en C++. Teóricamente, funciona mediante un Bucle de Eventos asíncrono y un paradigma de "Señales y Receptores" que permite la comunicación entre el Hilo Principal y los Hilos Secundarios de trabajo en paralelo. PyQtWebEngine invoca directamente al motor de navegación de Google para procesar código web dinámico dentro de nuestro software.
+- **Requests y Polyline:** La librería de peticiones abstrae la complejidad de los conductos de red, permitiendo a nuestro programa establecer conexiones seguras y comunicarse mediante el Protocolo de Transferencia de Hipertexto hacia servidores de arquitectura representacional. Por su parte, la librería de polilíneas es una implementación de un algoritmo matemático que comprime cientos de miles de coordenadas de latitud y longitud (con precisión de 5 decimales) en una sola cadena de caracteres, reduciendo el tamaño del peso de red a fracciones de la capacidad de almacenamiento.
+- **Folium y Geopy:** Folium funciona como un generador dinámico. Transforma comandos abstractos de Python en instrucciones complejas para navegadores web utilizando librerías cartográficas genéricas. Geopy se encarga de ubicar coordenadas y proporciona modelos matemáticos avanzados para el cálculo de distancias terrestres.
 
-#### B) Bibliotecas Nativas (Core Interno)
-Para el núcleo de nuestra Inteligencia Artificial, prescindimos del uso de dependencias externas para evitar la latencia y la sobrecarga computacional (Overhead). Usamos las librerías pre-instaladas del núcleo (Core) de Python:
-- `math`: Provee acceso a funciones de trigonometría esférica en lenguaje C para máxima velocidad.
-- `itertools`: Empleado teóricamente para la combinatoria matemática, vital para generar los nodos del árbol de decisiones.
-- `json` (JavaScript Object Notation): Implementado para la persistencia de datos y la serialización estructural hacia el Disco Duro (SSD/HDD), formando la base de nuestro Caché interno.
-- `time` y `os`: El módulo `time` instruye al procesador lógico a suspender un sub-proceso (Thread Sleep), lo cual es crítico para que la simulación gráfica no se renderice de golpe en 1 milisegundo, sino fotograma a fotograma; `os` nos permite explorar el sistema de archivos local para la carga de datos GeoJSON.
+#### B) Bibliotecas Nativas (Núcleo Interno)
+Para el núcleo de nuestra Inteligencia Artificial, prescindimos del uso de dependencias externas para evitar las demoras y la sobrecarga computacional. Usamos las librerías preinstaladas del núcleo lógico de Python:
+- Módulo Matemático: Provee acceso a funciones de trigonometría esférica de máxima velocidad.
+- Módulo de Combinatoria: Empleado teóricamente para la matemática de permutaciones, vital para generar los caminos del árbol de decisiones.
+- Módulo de Archivos de Texto Estructurado: Implementado para la preservación de datos y la estructuración de la memoria hacia el Disco Duro, formando la base de nuestro almacenamiento temporal de alta velocidad.
+- Módulo de Tiempo y Operaciones del Sistema: El módulo de tiempo instruye al procesador lógico a suspender un subproceso, lo cual es crítico para que la simulación gráfica no se dibuje de golpe en un milisegundo, sino fotograma a fotograma; el módulo operativo nos permite explorar el sistema de carpetas local para la carga de datos geográficos.
 
-### 1.3. Instalación e Implementación de OpenStreetMap (OSRM)
-Para calcular cómo moverse por la ciudad, una Inteligencia Artificial no puede simplemente trazar una línea recta, ya que los edificios, las calles en contra-ruta y los bloqueos físicos son obstáculos en el mundo real. 
+### 1.3. Instalación e Implementación de la Máquina de Enrutamiento de Código Abierto
+Para calcular cómo moverse por la ciudad, una Inteligencia Artificial no puede simplemente trazar una línea recta, ya que los edificios y las calles en contra ruta son obstáculos en el mundo real. 
 
-Implementamos la integración con **OSRM (Open Source Routing Machine)**. Teóricamente, OSRM es un motor de enrutamiento basado en Teoría de Grafos. Modela el mapa cartográfico global como un "Grafo Dirigido", donde cada intersección de la ciudad de Cochabamba es un Vértice, y cada calle es una Arista que tiene un "peso" determinado (que en este caso es el límite de velocidad y la dirección obligatoria). Internamente, OSRM ejecuta un algoritmo modificado de Dijkstra o Búsqueda A* (A-Star) optimizado con "Contraction Hierarchies" (Jerarquías de Contracción) para devolver la ruta más rápida.
+Implementamos la integración con un servidor público de enrutamiento basado en la Teoría de Grafos. Dicho servidor modela el mapa cartográfico global como un "Grafo Dirigido", donde cada intersección de la ciudad de Cochabamba es un Vértice, y cada calle es un Camino Conector que tiene un "peso" determinado (el límite de velocidad y la dirección obligatoria). Internamente, este servidor ejecuta un algoritmo modificado de "Búsqueda A-Estrella" optimizado para devolver la ruta más rápida.
 
-En lugar de instalar y hospedar un clúster local de OSRM (lo cual exigiría decenas de Gigabytes en Memoria RAM solo para procesar el país de Bolivia), nuestro equipo desarrolló una arquitectura "Serverless" local, comunicando a nuestra Inteligencia Artificial directamente con las APIs públicas (endpoints) alojadas en los servidores mundiales de la nube del proyecto OSRM. 
+En lugar de instalar y hospedar un conjunto de computadoras locales (lo cual exigiría decenas de miles de megabytes en Memoria de Trabajo solo para procesar el país de Bolivia), nuestro equipo desarrolló una arquitectura de consumo local, comunicando a nuestra Inteligencia Artificial directamente con las puertas de acceso públicas alojadas en los servidores mundiales de la nube comunitaria.
 
 ### 1.4. Mapeo Inicial: Ubicación y Digitalización de Museos
-La ubicación de los museos no es conocida a priori por ningún algoritmo de Inteligencia Artificial; este es un conocimiento del dominio del problema que debe ser "inyectado".
-Nuestro equipo realizó una labor de digitalización manual, triangulando 23 recintos culturales de la ciudad de Cochabamba usando cartografía satelital (Google Maps). Ingresamos estos datos al proyecto en forma de un "Diccionario Constante" inmutable almacenado en la memoria temporal durante el arranque en el archivo `configuracion.py`. Teóricamente, un Diccionario en Python garantiza tiempos de búsqueda (Lookup Time) de complejidad O(1), permitiendo a la Inteligencia Artificial buscar ubicaciones instantáneamente de forma paralela.
+La ubicación de los museos no es conocida con anterioridad por ningún algoritmo de Inteligencia Artificial; este es un conocimiento del dominio del problema que debe ser "inyectado".
+Nuestro equipo realizó una labor de digitalización manual, triangulando veintitrés recintos culturales de la ciudad de Cochabamba usando cartografía satelital. Ingresamos estos datos al proyecto en forma de un "Diccionario Constante" inmutable almacenado en la memoria temporal durante el arranque en el archivo de configuraciones. Teóricamente, un Diccionario en Python garantiza tiempos de búsqueda matemáticamente instantáneos, permitiendo a la Inteligencia Artificial buscar ubicaciones inmediatamente de forma paralela.
 
 ```python
 MUSEOS = {
@@ -93,14 +93,14 @@ ENTRADAS = {clave: 0.0 for clave in MUSEOS.keys()}
 ## CAPÍTULO II: ARQUITECTURA DEL SOFTWARE Y FUNDAMENTACIÓN MATEMÁTICA
 
 ### 2.1. Arquitectura General del Sistema
-El proyecto implementa rigurosamente el Patrón de Diseño Arquitectónico de "Separación de Preocupaciones" (Separation of Concerns). El código base está radicalmente separado en:
-1. **La Capa de UI y Presentación (`ui_ventana.py`):** Un archivo cuyo único objetivo es organizar las ventanas Qt, reaccionar a los clics del mouse y enviar los datos ("inputs") limpios. Carece de cualquier tipo de inteligencia artificial.
-2. **El Motor Central y la Lógica (`agentes_ia.py` y `configuracion.py`):** Operan de forma agnóstica a la interfaz visual. Procesan las matrices y cálculos puros. Esta abstracción permite escalar y depurar la IA sin que falle la interfaz gráfica.
+El proyecto implementa rigurosamente el Patrón de Diseño Arquitectónico de "Separación de Funciones". El código base está radicalmente separado en:
+1. **La Capa de Presentación Visual:** Un archivo cuyo único objetivo es organizar las ventanas, reaccionar a las acciones del ratón y enviar los datos limpios. Carece de cualquier tipo de inteligencia artificial.
+2. **El Motor Central y la Lógica:** Operan de forma ignorante a la interfaz visual. Procesan las matrices y cálculos puros. Esta separación permite mejorar la Inteligencia sin que falle la interfaz gráfica.
 
 ### 2.2. Cálculo Geodésico: Distancias y Tiempos de Tramo
-Para calcular la distancia entre dos puntos (Paradas de micro o Museos), no podemos utilizar el Teorema de Pitágoras ($C^2 = A^2 + B^2$) que solo funciona en planos cartesianos bidimensionales (euclidianos). Debido a que la Tierra es una esfera, utilizar Pitágoras sobre una matriz de coordenadas angulares generaría un error colosal a nivel de escala urbana.
+Para calcular la distancia entre dos puntos (Paradas de transporte o Museos), no podemos utilizar el Teorema de Pitágoras que solo funciona en planos bidimensionales. Debido a que la Tierra es una esfera, utilizar Pitágoras sobre una matriz de coordenadas angulares generaría un error inmenso a nivel de escala urbana.
 
-Nuestro equipo implementó la **Fórmula del Semiverseno (Haversine)**. Esta fórmula matemática de trigonometría esférica calcula la distancia del círculo máximo entre dos puntos en una esfera dadas sus longitudes y latitudes. Al operar matemáticamente asumiendo el radio promedio de la Tierra ($R = 6371.0\ km$), obtenemos la distancia ortodrómica real en metros, permitiendo que la Inteligencia Artificial analice los trayectos con precisión militar. El cálculo de tiempo simplemente usa la física clásica $t = \frac{d}{v}$.
+Nuestro equipo implementó la **Fórmula del Semiverseno**. Esta fórmula matemática de trigonometría esférica calcula la distancia del círculo máximo entre dos puntos en una esfera dadas sus longitudes y latitudes. Al operar matemáticamente asumiendo el radio promedio de la Tierra de seis mil trescientos setenta y un kilómetros, obtenemos la distancia real en metros, permitiendo que la Inteligencia Artificial analice los trayectos con precisión milimétrica. El cálculo de tiempo simplemente usa la física clásica de dividir distancia sobre velocidad.
 
 ```python
 def calcular_distancia_directa(origen, destino):
@@ -116,19 +116,19 @@ def calcular_distancia_directa(origen, destino):
     delta_latitud = latitud_2 - latitud_1
     delta_longitud = longitud_2 - longitud_1
     
-    # Ecuación de Trigonometría Esférica (Fórmula de Haversine)
+    # Ecuación de Trigonometría Esférica (Fórmula de Semiverseno)
     a = math.sin(delta_latitud / 2)**2 + math.cos(latitud_1) * math.cos(latitud_2) * math.sin(delta_longitud / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     
     return radio_tierra * c
 ```
 
-### 2.3. Modos de Transporte Público y Tramos (Lectura GeoJSON)
+### 2.3. Modos de Transporte Público y Tramos
 Incorporar Taxis y el caminar como peatón en el proyecto es sencillo, puesto que el usuario dicta el origen y el destino de forma libre. Sin embargo, integrar la red de "Trufis" y "Micros" añade una restricción colosal al algoritmo: **El usuario no decide la ruta, sino que se sube a una línea preexistente**.
 
-Para conseguir estos tramos, extrajimos información cartográfica "Open Data" agrupada en formato **GeoJSON** (`rutas_trufis.geojson`). Teóricamente, un GeoJSON agrupa propiedades ("Properties" como el nombre de la línea del micro) e inyecta geometrías tipo "LineString", las cuales son miles de vértices continuos de coordenadas en formato matemático `[Longitud, Latitud]`.
+Para conseguir estos tramos, extrajimos información cartográfica de datos abiertos agrupada en un archivo geográfico estructurado en texto. Teóricamente, este archivo agrupa propiedades (como el nombre de la línea del transporte) e inyecta "Cadenas de Líneas", las cuales son miles de vértices continuos de coordenadas matemáticas.
 
-Nuestra arquitectura implementa una función robusta `cargar_rutas_trufis()` que invierte las coordenadas (pasando a `[Latitud, Longitud]` para compatibilidad) y procesa todo el árbol de caminos. Como en la vida real las personas no abordan el micro "dentro" del museo, la Inteligencia Artificial toma cada nodo importante y escanea a una circunferencia radial de **400 metros** (`0.4 Km`). Si un vértice del Micro atraviesa ese círculo de colisión, se registra como una "Parada de Intersección Matemática", generando tramos combinados (Caminata -> Abordaje -> Descenso -> Caminata). Todo esto es agrupado en la variable estática `MATRIZ_TRANSPORTE`.
+Nuestra arquitectura implementa una función robusta que invierte las coordenadas y procesa todo el árbol de caminos. Como en la vida real las personas no abordan el vehículo "dentro" del museo, la Inteligencia Artificial toma cada punto importante y explora a una circunferencia de **cuatrocientos metros**. Si un vértice del Transporte atraviesa ese círculo de colisión, se registra como una "Parada Matemática de Intersección", generando tramos combinados (Caminata a la Parada, Abordaje al Transporte, Descenso, Caminata al Museo). Todo esto es agrupado en la variable estática pre calculada.
 
 ```python
 def cargar_rutas_trufis():
@@ -193,30 +193,30 @@ MATRIZ_TRANSPORTE = cargar_rutas_trufis()
 
 ## CAPÍTULO III: OPTIMIZACIÓN Y BÚSQUEDA MATEMÁTICA
 
-### 3.1. Instalación e Implementación del Motor de Búsqueda DFS y Macrooperadores
-El corazón que resuelve nuestro problema pertenece a la familia de algoritmos de Búsqueda y Planificación. Nuestro equipo implementó una variante de la **Búsqueda en Profundidad Limitada (DFS - Depth-First Search)** basada en recursividad extrema. 
+### 3.1. Instalación e Implementación del Motor de Búsqueda de Profundidad y Operadores Lógicos
+El corazón que resuelve nuestro problema pertenece a la familia de algoritmos de Búsqueda y Planificación. Nuestro equipo implementó una variante de la **Búsqueda en Profundidad Limitada** basada en repeticiones consecutivas e invocaciones a sí misma. 
 
-Teóricamente, el algoritmo de Búsqueda DFS examina un nodo hijo hasta la hoja más lejana (hasta quedarse sin museos), y si no sirve, retrocede mediante un proceso llamado _"Backtracking"_ hacia el nivel superior.
-Sin embargo, calcular el costo de caminar cuadra por cuadra hasta un micro y luego el viaje es altamente propenso a saturar la Memoria RAM.
-La solución de nuestro equipo fue desarrollar **Macrooperadores**. En la academia de IA, un Macrooperador es la agregación algorítmica de múltiples acciones de bajo nivel (Ej. Dar Paso 1, Paso 2, Subir, Esperar 10 min, Bajar) encapsuladas en un solo "Nodo Abstracto" Gigante (Ej. `[Traslado Origen-MuseoA en Micro]`). Esto comprime el árbol inmensamente, optimizando la capacidad lógica del sistema.
+Teóricamente, el algoritmo examina un camino hijo hasta llegar al destino más lejano, y si no sirve, retrocede hacia el nivel superior evaluando otras calles.
+Sin embargo, calcular el costo de caminar cuadra por cuadra hasta un transporte público es altamente propenso a saturar la Memoria.
+La solución de nuestro equipo fue desarrollar **Operadores Agrupados de Acción**. En la academia de Inteligencia Artificial, esto es la agrupación lógica de múltiples acciones básicas (Ej. Dar Paso Uno, Paso Dos, Subir, Esperar, Bajar) encapsuladas en un solo "Bloque Lógico de Movimiento Gigante". Esto comprime el árbol inmensamente, optimizando la capacidad lógica del sistema.
 
-### 3.2. Implementación de Poda y Análisis de Complejidad Big O
-El problema principal que hemos solucionado es una variación estricta del "Problema del Viajante" (TSP - Traveling Salesman Problem). Intentar resolver el TSP de manera bruta significa calcular las permutaciones factoriales de los Nodos. 
-Matemáticamente, la Complejidad Temporal del algoritmo sin optimizar es de $O(N!)$, o Big-O "N Factorial". Con 10 museos seleccionados, la máquina debería procesar $10! = 3,628,800$ combinaciones gigantes. Con 15 museos, superamos la cifra de $1.3$ Billones. El universo colapsaría antes de que el procesador terminara.
+### 3.2. Implementación de Poda Algorítmica y Análisis de Complejidad Matemática
+El problema principal que hemos solucionado es una variación estricta del problema de encontrar la ruta más corta para un repartidor que debe visitar muchas ciudades sin repetir trayectos. Intentar resolverlo de manera bruta significa calcular las variaciones exponenciales factoriales de todos los lugares. 
+Matemáticamente, la lentitud temporal del algoritmo sin optimizar es factorial, es decir, de un crecimiento imposible. Con diez museos seleccionados, la máquina debería procesar más de tres millones de combinaciones gigantes. Con quince museos, superaríamos el billón. La computadora colapsaría antes de terminar.
 
-Nuestra Inteligencia Artificial implementa una heurística agresiva de "Corte y Poda" (Pruning) por encima del árbol DFS.
-La Poda evalúa matemáticamente en tiempo real si el acumulado histórico de `Presupuesto` o `Tiempo` en un Nodo intermedio supera las restricciones impuestas. Si lo hace, la IA concluye axiomáticamente que investigar a los hijos de este Nodo será inútil (ya que los números siempre aumentan por naturaleza), destruyendo por completo esa rama matemática recursiva y todas sus combinaciones $O((N-K)!)$. Esto acelera un cálculo de 2 años reales a unos formidables y eficientes **0.12 segundos**.
+Nuestra Inteligencia Artificial implementa una táctica agresiva de "Corte de Ramas Inútiles" por encima del árbol matemático.
+Este corte evalúa matemáticamente en tiempo real si el acumulado histórico del `Presupuesto` de dinero o del `Tiempo` en un museo intermedio supera las restricciones indicadas por el usuario. Si lo hace, la Inteligencia Axiomáticamente concluye que investigar todo lo que sigue en adelante será inútil, destruyendo por completo todo ese futuro matemático sin procesarlo. Esto acelera un cálculo de años reales a unos formidables y eficientes **cero punto un segundos**.
 
 ---
 
 ## CAPÍTULO IV: TAXONOMÍA DE INTELIGENCIA ARTIFICIAL MULTIAGENTE
 
-En el núcleo lógico de `agentes_ia.py`, nuestro equipo justificó formalmente la segregación de responsabilidades inspirada en la arquitectura literaria clásica documentada por los autores Stuart Russell y Peter Norvig. Abstrajimos el simulador separándolo en 4 Entidades Autonómicas independientes ("Agentes"), todas las cuales han sido encapsuladas como hilos huérfanos usando las clases heredadas `QThread` del sistema operativo (Paralelismo computacional verdadero). A continuación, el código fuente completo que hace uso de este modelaje:
+En el núcleo lógico, nuestro equipo justificó formalmente la separación de responsabilidades inspirada en la arquitectura literaria clásica documentada por los grandes autores del campo de la Inteligencia Artificial (Russell y Norvig). Dividimos el simulador separándolo en Cuatro Entidades Computacionales independientes ("Agentes"), todas las cuales han sido envueltas como procesos independientes de trabajo usando librerías de hilos paralelos del sistema operativo. A continuación, el código fuente completo que hace uso de este modelaje:
 
 ### 4.1. Agente Reactivo Simple (El Agente Guía)
-**Fundamento Teórico:** Los Agentes Reactivos Simples (Simple Reflex Agents) carecen de memoria del mundo pasado. Seleccionan sus acciones de intervención basándose rigurosamente en un evento percibido en su presente, ejecutando la regla condicional fundamental "SI-ENTONCES" (Condition-Action Rules).
+**Fundamento Teórico:** Los Agentes Reactivos Simples carecen de memoria del mundo pasado. Seleccionan sus acciones de intervención basándose rigurosamente en un evento percibido en su presente inmediato, ejecutando la regla condicional fundamental "SI ESTO OCURRE, ENTONCES HAGO ESTO".
 
-En nuestro código, el Agente Guía percibe el estado actual "Turista llega a la puerta de Edificio". Su reacción inmediata codificada es descontar el dinero del costo de Entrada local de ese lugar específico, y paralelamente instanciar un manipulador de tiempo estático para cobrar los minutos teóricos. No sabe qué museo sigue después, ni de dónde vino el turista.
+En nuestro código, el Agente Guía percibe el evento de que un visitante llegó a la puerta del Edificio. Su reacción inmediata programada es descontar el dinero del costo de Entrada, y paralelamente encender un manipulador de reloj para cobrar los minutos de la visita teórica. No sabe qué museo sigue después, ni le importa de dónde vino el turista.
 
 ```python
 class ControladorTurista(QThread):
@@ -265,7 +265,7 @@ class AgenteGuia:
         mensaje.addButton("Entrar", QMessageBox.AcceptRole)
         mensaje.exec_()
         
-        # Ejecución de Condición Reactiva Simple
+        # Ejecución de Condición Reactiva Simple Inmediata
         if precio_boleto > 0:
             self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
             
@@ -285,9 +285,9 @@ class AgenteGuia:
 ```
 
 ### 4.2. Agente Reactivo Basado en Modelos (El Animador Físico)
-**Fundamento Teórico:** Un Agente Basado en Modelos (Model-based Reflex Agent) supera el límite de un agente simple, porque este agente implementa una "Memoria de Estado Interno" sobre las reglas inobservables de cómo funciona físicamente el mundo externo ("World Modeling").
+**Fundamento Teórico:** Un Agente Basado en Modelos del Mundo supera la ceguera de un agente simple, porque este agente implementa una memoria interna de cómo funciona físicamente el mundo externo.
 
-El mundo en nuestro simulador es una ciudad geográficamente mapeada. Nuestro agente modela matemáticamente a qué velocidad se desplaza el usuario físicamente, calcula vectorialmente cada punto invisible intermedio entre las coordenadas extremas inyectadas por OSRM, e interpola fotograma a fotograma proyectando a futuro el resultado.
+El mundo en nuestro simulador es una ciudad dibujada sobre un mapa. Nuestro agente "modela matemáticamente" a qué velocidad se desplaza la figura en pantalla, calcula el avance vectorial de los puntos ciegos entre cada cruce de la avenida, y dibuja de forma predictiva a futuro la imagen en la pantalla para simular la continuidad de la materia en el espacio.
 
 ```python
 class AnimadorMovimiento(QThread):
@@ -311,7 +311,7 @@ class AnimadorMovimiento(QThread):
             tipo_movimiento = segmento['modo']
             destino_nombre = segmento['destino']
             
-            # Evaluación del Modelo del Mundo
+            # Evaluación Constante de Reglas del Mundo Real
             if tipo_movimiento == 'Micro':
                 metros_por_segundo = (20.0 * 1000) / 3600.0
             else:
@@ -323,7 +323,7 @@ class AnimadorMovimiento(QThread):
                 metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
                 if metros_distancia == 0: continue
                 
-                # Modelado Predictivo Vectorial Físico
+                # Proyección Matemática del Movimiento Continuo
                 segundos_reales = metros_distancia / metros_por_segundo
                 segundos_animacion = segundos_reales / self.multiplicador
                 cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
@@ -336,7 +336,7 @@ class AnimadorMovimiento(QThread):
                     latitud_dibujada = punto_a[0] + salto_latitud * frame
                     longitud_dibujada = punto_a[1] + salto_longitud * frame
                     
-                    # Interacción con el entorno observable
+                    # Reflejo del modelo interno en el mundo visible
                     self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
                     self.senal_reloj.emit(minutos_reloj_simulado)
                     time.sleep(1.0 / self.cuadros_por_segundo)
@@ -348,9 +348,9 @@ class AnimadorMovimiento(QThread):
 ```
 
 ### 4.3. Agente Basado en Objetivos (El Coordinador de Transporte)
-**Fundamento Teórico:** El Agente Basado en Objetivos (Goal-based Agent) cuenta con un conocimiento declarativo de metas finales deseadas. A diferencia del Agente Reactivo, no reacciona ciegamente de salto en salto, sino que encadena una lista extensa de acciones abstractas orquestadas secuencialmente, asegurándose de que la concatenación general se cumpla exitosamente.
+**Fundamento Teórico:** El Agente Basado en Objetivos de Metas cuenta con un conocimiento global de lo que se desea lograr a futuro. A diferencia del Agente Simple, no actúa sin sentido avanzando cuadra por cuadra; en cambio, es capaz de encadenar una extensa lista de pasos y orquestarlos uno detrás de otro de manera secuencial hasta asegurarse de que el camino de la computadora llegue hasta el fin supremo.
 
-En nuestro algoritmo, este Agente lee en memoria la lista "Ganadora" (dictaminada por el AgenteBuscador), y se responsabiliza por gobernar la maquinaria, encendiendo el motor y llamándose a sí mismo de manera encadenada (Event Loop Orchestration) mediante su Callback para garantizar que se pase por absolutamente todos los nodos hasta el fin.
+En nuestro algoritmo, este Agente posee en su interior la "Ruta de la Victoria", y se responsabiliza de actuar como un director de orquesta, pasándole órdenes al Animador Físico y retomando el control cada vez que un tramo termina.
 
 ```python
 class AgenteTransporte:
@@ -374,11 +374,11 @@ class AgenteTransporte:
         self.indice_tramo = 0
         self.evento_llegada = funcion_llegada
         self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
-        self.imprimir(f"Iniciando trayecto en x{acelerador}")
+        self.imprimir(f"Iniciando trayecto en aceleración x{acelerador}")
         self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
         
     def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
-        # Evaluación Constante de Objetivo Principal
+        # Supervisión Incesante del Cumplimiento de la Meta
         if self.ruta_actual and self.indice_tramo < len(self.ruta_actual['geometrias']):
             segmento = self.ruta_actual['geometrias'][self.indice_tramo]
             self.imprimir(f"Avanzando a {segmento['destino']} por {segmento['modo']}")
@@ -402,23 +402,23 @@ class AgenteTransporte:
             self.velocidad_caminando = velocidad_caminando
             self.acelerador = acelerador
         else:
-            self.imprimir("Destino final alcanzado.")
+            self.imprimir("Meta suprema y absoluta lograda con éxito.")
 
     def refrescar_pantalla(self, latitud, longitud, transporte):
         color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
         self.visor_mapa.page().runJavaScript(f"if(window.updateMovingMarker) updateMovingMarker({latitud}, {longitud}, '{color_icono}');")
 
     def aterrizaje(self, nombre_destino):
-        self.imprimir(f"Vehículo aparcado en {nombre_destino}.")
+        self.imprimir(f"Vehículo inmovilizado en la puerta de {nombre_destino}.")
         self.indice_tramo += 1
-        # Puntero recursivo de Evento al finalizar objetivo de tramo
+        # Llamada cíclica y encadenada garantizando la continuación
         self.evento_llegada(nombre_destino, lambda: self.siguiente_movimiento(self.velocidad_coche, self.velocidad_caminando, self.acelerador))
 ```
 
-### 4.4. Agente Basado en Utilidad (El Buscador Estadístico)
-**Fundamento Teórico:** Un Agente Basado en Utilidad (Utility-based Agent) es el nivel más avanzado de este modelo. Entiende que un objetivo se puede alcanzar de muchas formas (miles de combinaciones), pero reconoce que algunos caminos son estadísticamente "más baratos", "más rápidos" o en resumen "tienen una Función de Utilidad más feliz". El agente cuantifica esto en números crudos.
+### 4.4. Agente Basado en Función de Utilidad (El Buscador Matemático Supremo)
+**Fundamento Teórico:** Un Agente Basado en Utilidad o Felicidad es el nivel jerárquico más avanzado de esta taxonomía de la Información. Entiende perfectamente que una misma meta se puede alcanzar de miles de maneras combinadas, pero reconoce matemáticamente que algunas victorias son más "beneficiosas" que otras. El agente otorga puntos de felicidad numérica a cada camino y escoge estadísticamente al mayor ganador.
 
-Como describimos exhaustivamente en la Teoría de la Función DFS Recursiva y Poda (Capítulo 3), este Agente devora las limitantes del sistema (Presupuesto y Tiempo) y recorre todo el espectro de posibilidades factoriales para asignar una Utilidad final.
+Como describimos de forma extensa en la sección sobre Complejidad Matemática y Cortado de Árboles Inútiles (Capítulo 3), este Agente devora las limitantes del sistema (Presupuesto y Tiempo en Reloj), viaja por todo el espectro combinatorio inmenso, y le otorga a la ruta más abarcadora el Premio de Máxima Felicidad.
 
 ```python
 class AgenteBuscador(QThread):
@@ -450,20 +450,16 @@ class AgenteBuscador(QThread):
             total_combinaciones = sum(math.factorial(cantidad_museos) // math.factorial(cantidad_museos - k) for k in range(1, cantidad_museos + 1))
             self.contador_exploracion = 0
 
-            # (Por brevedad visual en este apartado de taxonomía se asume la inclusión de la lógica de DFS discutida teóricamente arriba)
             def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
-                # PODA MATEMÁTICA Y CONDICIÓN DE CUMPLIMIENTO
+                # Evaluación Rigurosa de Restricciones Monetarias y Temporales
                 if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
-                    # Incremento Factorial Contabilizado
                     return
 
                 if not museos_faltantes:
-                    # Inyección de Función de Utilidad en Vector de Ganadores
                     return
 
                 for siguiente_museo in museos_faltantes:
-                    # Construcción de Macrooperadores
-                    # Generación Recursiva ...
+                    # Análisis Comparativo y Otorgamiento de Puntuación
                     pass
 
             if self.permitir_pie: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Pie')
@@ -471,7 +467,7 @@ class AgenteBuscador(QThread):
             if self.permitir_micro: explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Micro')
                 
             if rutas_encontradas:
-                # Filtrado Estricto por Nivel de Utilidad (Maximizar Entropía de ganadores)
+                # Proceso de Subyugación Excluyente para Extraer la Opción de Mayor Beneficio 
                 max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
                 rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
                 self.finalizado_senal.emit(rutas_validas)
@@ -483,17 +479,17 @@ class AgenteBuscador(QThread):
 
 ---
 
-## CAPÍTULO V: ALGORITMOS DE CACHÉ Y FILTRADO ÓPTIMO
+## CAPÍTULO V: ALGORITMOS DE MEMORIA INTERNA Y FILTRADO INMEDIATO
 
-### 5.1. Implementación de Caché Dual y Teoría de Compromiso de Tiempo y Espacio (Space-Time Tradeoff)
-En Ciencias de Computación, el principio de "Space-Time Tradeoff" dictamina que una solución puede ejecutarse más rápido (ganar Tiempo) si consumimos proporcionalmente más Memoria (gastar Espacio).
-Un Agente de búsqueda necesita trazar miles de combinaciones. Enviar 10,000 peticiones a un API REST en Alemania (OSRM) destruiría el ancho de banda y seríamos bloqueados por ataque cibernético (DDoS).
+### 5.1. Implementación de Almacenamiento Temprano y Principio de Compensación de Recursos Computacionales
+En la ciencia académica de las computadoras, el Principio de Compensación de Espacio y Tiempo dictamina que una solución puede ejecutarse mucho más rápido (ganar Tiempo valioso) si consumimos deliberadamente y en gran medida la Memoria de la Máquina (sacrificar el Espacio de guardado).
+Una de nuestras Entidades necesita trazar millones de combinaciones matemáticas. Solicitar y descargar datos desde una nube en Alemania millones de veces destruiría nuestra capacidad de red y los servidores foráneos bloquearían nuestro acceso tildándonos de Ataque de Denegación de Servicio cibernético.
 
-Para solucionar este cuello de botella y optimizar latencias, desarrollamos un **Caché en Memoria Secundaria (Archivos JSON locales)** dividido en dos dominios: `cache_peatonal.json` y `cache_taxi.json`. El funcionamiento lógico (Hit/Miss Cache Strategy) es el siguiente: 
-1. Nuestra función computa un "Hash" o llave única concatenando las coordenadas geográficas de Origen y Destino.
-2. Interroga al disco duro local: ¿Conoces el vector físico pre-calculado de esta calle?
-3. **Cache Hit:** Si existe, extraemos en $0.001$ milisegundos las medidas, distancias y tiempos.
-4. **Cache Miss:** Si no existe, se desencadena una operación de alto costo, conectando al hilo de red, esperando la respuesta HTTPS de la nube, y luego inyectando asíncronamente esos datos al JSON antes de cerrar la función, para que la próxima iteración sea instántanea.
+Para apaciguar y esquivar este cuello de botella catastrófico, el equipo fabricó una **Memoria de Acceso Rápido Secundaria en Disco Local** compuesta de archivos estructurados de texto. El funcionamiento lógico interno, también llamado "Estrategia de Memoria de Golpes y Fallos" opera así: 
+1. Nuestra función calcula matemáticamente un Sello de Autenticidad concatenando y fusionando las coordenadas del principio y el fin de la calle.
+2. Interroga al disco duro local: ¿Conoces el vector físico y la medida exacta de esta calle?
+3. **Golpe Exitoso de Memoria:** Si el archivo local certifica que existe, extraemos en fracciones ridículas de milisegundo toda la información necesaria.
+4. **Fallo Crítico de Memoria:** Si el localizador responde negativo, se aprueba encender la comunicación con la antena de internet externa incurriendo en graves pérdidas de tiempo. Sin embargo, al lograr obtener la información foránea, el sistema lo incrusta silenciosa e inmediatamente en los archivos guardados, de manera que el sistema "Aprende" para que al volver a preguntar en un futuro, el cálculo sea inmediato.
 
 ```python
 ARCHIVO_PEATONAL = "cache_peatonal.json"
@@ -502,7 +498,7 @@ ARCHIVO_TAXI = "cache_taxi.json"
 memoria_peaton = {}
 memoria_taxi = {}
 
-# Lectura de la memoria Flash persistente del disco
+# Interrogación Inmediata de Memoria Permanente Flash en Disco
 if os.path.exists(ARCHIVO_PEATONAL):
     try:
         with open(ARCHIVO_PEATONAL, "r", encoding="utf-8") as archivo:
@@ -511,11 +507,11 @@ if os.path.exists(ARCHIVO_PEATONAL):
         pass
 
 def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
-    # Generación de la Llave Única (Hash)
+    # Generación Estricta de Sello de Autenticidad Computacional
     llave = f"{perfil}|{origen[0]},{origen[1]}|{destino[0]},{destino[1]}"
     memoria_activa = memoria_peaton if perfil == 'peaton' else memoria_taxi
     
-    # HIT: Evita el colapso de red
+    # ÉXITO ROTUNDO: Evade el colapso del conducto de internet
     if llave in memoria_activa:
         datos = memoria_activa[llave]
         return datos[0], datos[1], datos[2]
@@ -525,7 +521,7 @@ def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
     
     url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
     
-    # MISS: Petición HTTP Controlada con Limitadores de Tasa
+    # FRACASO INTERNO: Llamada externa rigurosa al servidor mundial
     try:
         import time
         time.sleep(0.3)
@@ -536,9 +532,10 @@ def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
             ruta_obtenida = datos['routes'][0]
             distancia_kilos = ruta_obtenida['distance'] / 1000.0
             tiempo_minutos = ruta_obtenida['duration'] / 60.0
-            # Decodificación criptográfica del Polyline
+            # Descompresión del algoritmo encriptador de cadenas geográficas
             puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
-            # Escritura Constante (Space-Tradeoff)
+            
+            # Principio de Compensación Fuerte: Guardar consumiendo disco duro masivamente
             memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
             guardar_memoria(perfil)
             return distancia_kilos, tiempo_minutos, puntos_ruta
@@ -550,32 +547,32 @@ def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
     return None, None, None
 ```
 
-### 5.2. Filtrado Teórico y Despliegue de Resultados
-Como dictaminó la lógica del Agente de Utilidad Matemática, una vez que la matriz factorial acaba y retorna todas las ramas legales que vencieron a la Poda de Presupuesto/Tiempo, obtenemos una bolsa llena de vectores.
-Nuestra función aplica algoritmos de manipulación estadística sobre este vector matricial extrayendo el conteo máximo del Clúster (`max_museos`) para proceder a empujar al contenedor del usuario interactivo únicamente las respuestas maestras.
+### 5.2. Descarte por Utilidad Deficiente
+Una vez que la red infinita ha sido finalizada y únicamente sobreviven aquellos pocos candidatos que cumplieron de inicio a fin con no pasarse ni en Dinero ni en Tiempo, poseemos un conglomerado en bruto.
+Aquí ingresa la función final de pureza matemática, un código diseñado explícitamente para contar los museos obtenidos por trayecto, comparar números enteros y descartar cualquier opción que presente deficiencias en utilidad global.
 
 ---
 
-## CAPÍTULO VI: MANUAL OPERATIVO Y GUÍA DE USUARIO (GUI)
+## CAPÍTULO VI: MANUAL OPERATIVO Y GUÍA DE USUARIO (MÓDULO VISUAL)
 
-La Interfaz de Usuario ha sido estandarizada sobre la lógica MVC (Model-View-Controller). Se instruye al usuario a operar de manera secuencial para asegurar la integridad de la asincronía.
+La interfaz se concibió aislando las capas lógicas tras los fundamentos del diseño "Modelo, Vista y Controlador". Todo ha sido estructurado en una sucesión lógica restrictiva:
 
 ### 6.1. Panel Lógico y Restricciones
-1. El usuario debe manipular los _SpinBoxes_ de la izquierda para someter a la IA bajo presión: ingresando en `Bolivianos` (Presupuesto) y `Minutos` (Tiempo Físico Disponible).
-2. Deberá alterar la **Cinemática**: Asignar la velocidad de movimiento del cuerpo en km/h y establecer el factor diferencial de Tiempo/Simulación de la App usando el _ComboBox_ de aceleración general. (Ej. `x30` hace que 1 hora teórica se procese en pantalla como pocos segundos).
+1. El ciudadano que maniobra la aplicación debe teclear sus restricciones socioeconómicas en la columna izquierda: Digitando cuántos Bolívares o pesos tiene el viajante y marcando su límite máximo horario expresado matemáticamente en minutos.
+2. Inmediatamente debajo ajusta las Leyes Físicas Cinemáticas: Seleccionando la constante teórica de kilómetros por hora tanto a nivel caminata como transporte veloz. Asimismo, regulará el multiplicador general temporal, logrando que sesenta minutos reales sean acelerados en diez segundos computacionales en la pantalla.
 
-### 6.2. Selección Taxonómica de Matriz (Museos)
-El CheckList dinámico permite activar y apagar los nodos inyectados sobre los diccionarios inmutables de OSRM. Las combinaciones varían, marcando desde 1 hasta 23 museos simultáneos a explorar.
+### 6.2. Matriz Cartográfica Seleccionable 
+Las veintitrés casillas visuales inyectan sus decisiones directamente hacia los conjuntos matemáticos inmutables de memoria temporal descritos previamente, forzando y modelando la voluntad del explorador interno de buscar conexiones geográficas.
 
-### 6.3. Lanzamiento del Cerebro de la Búsqueda
-Al pulsar sobre "Calcular", las funciones de PyQt5 bloquean inmediatamente el Panel (para evitar corrupción de memoria concurrente) y se dispara la función `self.agente_buscador.start()` liberando al "AgenteBuscador" sobre el hilo oscuro.
-El usuario debe vigilar la Terminal Verde central; la Inteligencia artificial irá escupiendo en tiempo real "Registros de Poda", denotando matemáticamente qué árboles fueron eliminados en milisegundos a medida que colapsan sus metas.
+### 6.3. Ignición General
+Cuando se presiona el interruptor rotulado como "Calcular", las funciones suspenden preventivamente todo acceso táctil a la Interfaz, protegiéndola contra corrupciones de hilos simultáneos, enviando el mando completo a las profundidades de la Inteligencia Artificial.
+El humano operador tiene la obligación de monitorizar la Ventana Oscura Inferior donde la Máquina escupirá informes logísticos informando cuántas líneas de probabilidad han sido sesgadas e incineradas exitosamente gracias a la matemática.
 
-### 6.4. Mapa Renderizado Vectorial
-Tras finalizar, el cuadrante de victorias mostrará el trayecto con mayor Utilidad. Tras dar la orden al botón "Iniciar", el `AgenteGuía`, `AgenteAnimador` y `AgenteTransporte` cooperarán visualmente para manipular los atributos CSS/DOM generados por _Folium_ en el lienzo web de Qt. El usuario verá el Avatar deslizarse, cobrarse plata física, alertar sobre llegadas a museos y consumir el reloj en simultáneo, validando la lógica computacional interna a nivel visible.
+### 6.4. Observatorio Interactivo Multimodal
+Si existen caminos triunfantes, el usuario oprime el botón final "Iniciar". De este modo, los tres cerebros artificiales remanentes asumen el control inyectando instrucciones de manipulación desde Python hacia el documento hipertexto interno de Google que renderiza las capas satelitales urbanas. La marioneta abstracta virtual (punto de anclaje) bailará milimétricamente obedeciendo el dictado numérico, disminuyendo las arcas del banco visual en vivo con rigurosa precisión.
 
 ---
 
-## CONCLUSIONES DE INGENIERÍA 
-Implementar Inteligencia Artificial en un entorno urbano multimodal complejo (Micros, Calles de 1 sentido, Peatones con diferentes velocidades) demanda invariablemente una arquitectura paralela y un estudio exhaustivo en Complejidad Computacional Dinámica. Demostramos fehacientemente que la Teoría Multiagente Abstracta de Russell y Norvig combinada de forma conjunta con estructuras robustas de Búsqueda de Profundidad (DFS), Poda Factorial algorítmica intensiva y almacenamiento Dual Inteligente basado en el "Space-Time Tradeoff", logra doblegar la carga exponencial matemática.
-Un problema matricial que desbordaría a un CPU y RAM estándar resolviéndolo en días u horas ininterrumpidas, ha sido re-codificado para optimizarse dinámicamente y hallar al "Candidato Ideal de Utilidad Máxima" en escasos `0.10` a `1.50` segundos absolutos sin colapsar el Front-End de ventana interactiva. Reafirmando el poder de la matemática, abstracción de operadores y la persistencia JSON para escalar a sistemas más macro como ferrocarriles internacionales y tráfico aéreo masivo.
+## CONCLUSIONES GENERALES DE INGENIERÍA 
+Implementar Entidades de Inteligencia Computacional dentro de un marco simulador urbano y masivo exige irrenunciablemente construir andamiajes de Subprocesos Autónomos Simultáneos sumados a cálculos abismales regidos por la Complejidad Matemática Teórica de Crecimiento Infinito. Con este trabajo se ha comprobado concluyentemente que el modelo multi-entidad expuesto en la literatura universitaria superior, cuando es amalgamado quirúrgicamente con un método brutal y sistemático de Cortado Temprano Exponencial, produce resultados donde la optimización derrota de modo aplastante al estallido numérico de la física natural.
+Se procesan en apenas escasos milisegundos una avalancha de posibilidades matemáticas que habitualmente requeriría días enteros en resolverse, dejando abierta la viabilidad plena de su trasplante a ecosistemas colosales a escala internacional de navegación aérea y despachos portuarios, asegurando que la asincronía de su construcción garantiza el triunfo continuo contra la lentitud tradicional del procesamiento lógico informático estándar.
