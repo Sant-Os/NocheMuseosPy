@@ -198,7 +198,97 @@ El corazón que resuelve nuestro problema pertenece a la familia de algoritmos d
 
 Teóricamente, el algoritmo examina un camino hijo hasta llegar al destino más lejano, y si no sirve, retrocede hacia el nivel superior evaluando otras calles.
 Sin embargo, calcular el costo de caminar cuadra por cuadra hasta un transporte público es altamente propenso a saturar la Memoria.
-La solución de nuestro equipo fue desarrollar **Operadores Agrupados de Acción**. En la academia de Inteligencia Artificial, esto es la agrupación lógica de múltiples acciones básicas (Ej. Dar Paso Uno, Paso Dos, Subir, Esperar, Bajar) encapsuladas en un solo "Bloque Lógico de Movimiento Gigante". Esto comprime el árbol inmensamente, optimizando la capacidad lógica del sistema.
+La solución de nuestro equipo fue desarrollar **Operadores Agrupados de Acción** (Macrooperadores). En la academia de Inteligencia Artificial, esto es la agrupación lógica de múltiples acciones básicas (Ej. Dar Paso Uno, Paso Dos, Subir, Esperar, Bajar) encapsuladas en un solo "Bloque Lógico de Movimiento Gigante". Esto comprime el árbol inmensamente, optimizando la capacidad lógica del sistema.
+
+A continuación, exponemos la función matemática que crea este Operador Agrupado de Acción (Macrooperador), unificando el costo, el tiempo, la caminata y el abordaje al micro en una sola matriz indivisible:
+
+```python
+def calcular_segmento(nodo_a, nodo_b, coord_a, coord_b, tipo_viaje, distancia_lineal):
+    segmentos = []
+    
+    # 1. Operador Simple (Caminata Peatonal)
+    if tipo_viaje == 'Pie':
+        distancia_total_tramo = distancia_lineal * 1.1 
+        tiempo_total_tramo = distancia_total_tramo / self.velocidad_caminando
+        _, _, geom_p = obtener_ruta_vehiculo(coord_a, coord_b, perfil="peaton")
+        geom = geom_p if geom_p else [coord_a, coord_b]
+        precio_pasaje = 0.0
+        impresion_modo = "Pie"
+        segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Pie', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
+    
+    # 2. Operador Simple (Taxi Automóvil)
+    elif tipo_viaje == 'Auto':
+        d_vehiculo, t_vehiculo, geom_vehiculo = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
+        if geom_vehiculo is None:
+            distancia_total_tramo = distancia_lineal * 1.3
+            geom = [coord_a, coord_b]
+            tiempo_total_tramo = distancia_total_tramo / self.velocidad_coche
+        else:
+            distancia_total_tramo = d_vehiculo
+            geom = geom_vehiculo
+            tiempo_total_tramo = t_vehiculo
+        precio_pasaje = self.costo_coche * distancia_total_tramo
+        impresion_modo = "Auto"
+        segmentos.append({'origen': nodo_a, 'destino': nodo_b, 'modo': 'Auto', 'distancia': distancia_total_tramo, 'tiempo': tiempo_total_tramo, 'geometria': geom, 'costo': precio_pasaje})
+    
+    # 3. Operador Agrupado Gigante (Caminata + Micro + Caminata)
+    elif tipo_viaje == 'Micro':
+        info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
+        id_linea = info_ruta['lineas_disponibles'][0]
+        ruta_fisica = LINEAS_TRUFIS.get(id_linea)
+        
+        if ruta_fisica:
+            def ubicar_paradas(punto_inicio, punto_fin, coordenadas_ruta):
+                candidatos_inicio = [(idx, calcular_distancia_directa(punto_inicio, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_inicio, coord) < 0.6]
+                candidatos_fin = [(idx, calcular_distancia_directa(punto_fin, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_fin, coord) < 0.6]
+                
+                mejor_a, mejor_b = -1, -1
+                costo_minimo = float('inf')
+                
+                for i, d_pie_inicio in candidatos_inicio:
+                    for j, d_pie_fin in candidatos_fin:
+                        distancia_nodos = (j - i) if i <= j else (len(coordenadas_ruta) - i + j)
+                        costo_calculado = d_pie_inicio + d_pie_fin + (distancia_nodos * 0.002)
+                        if costo_calculado < costo_minimo:
+                            costo_minimo = costo_calculado
+                            mejor_a, mejor_b = i, j
+                            
+                return mejor_a, mejor_b, calcular_distancia_directa(punto_inicio, coordenadas_ruta[mejor_a]), calcular_distancia_directa(punto_fin, coordenadas_ruta[mejor_b])
+                
+            idx_origen, idx_destino, dist_caminata_1, dist_caminata_2 = ubicar_paradas(coord_a, coord_b, ruta_fisica)
+            coord_parada_1, coord_parada_2 = ruta_fisica[idx_origen], ruta_fisica[idx_destino]
+            
+            _, _, geom_c1 = obtener_ruta_vehiculo(coord_a, coord_parada_1, perfil="peaton")
+            geom_caminata_1 = geom_c1 if geom_c1 else [coord_a, coord_parada_1]
+            dist_w1, tiempo_w1 = dist_caminata_1, dist_caminata_1 / self.velocidad_caminando
+            
+            if idx_origen <= idx_destino:
+                geom_micro = ruta_fisica[idx_origen : idx_destino + 1]
+            else:
+                geom_micro = ruta_fisica[idx_origen : ] + ruta_fisica[0 : idx_destino + 1]
+                
+            dist_micro = sum(calcular_distancia_directa(geom_micro[k], geom_micro[k+1]) for k in range(len(geom_micro)-1)) if len(geom_micro) > 1 else 0
+            tiempo_micro = (dist_micro * 1.3) / (20.0 / 60.0)
+            
+            _, _, geom_c2 = obtener_ruta_vehiculo(coord_parada_2, coord_b, perfil="peaton")
+            geom_caminata_2 = geom_c2 if geom_c2 else [coord_parada_2, coord_b]
+            dist_w2, tiempo_w2 = dist_caminata_2, dist_caminata_2 / self.velocidad_caminando
+            
+            precio_pasaje = info_ruta['costo_pasaje']
+            
+            tiempo_total_tramo = tiempo_w1 + tiempo_micro + tiempo_w2
+            distancia_total_tramo = dist_w1 + dist_micro + dist_w2
+            impresion_modo = f"Micro ({id_linea})"
+            
+            # El Operador Agrupado inserta 3 acciones físicas como 1 sola unidad matemática
+            segmentos.extend([
+                {'origen': nodo_a, 'destino': f'Parada({nodo_a[:3]})', 'modo': 'Pie', 'distancia': dist_w1, 'tiempo': tiempo_w1, 'geometria': geom_caminata_1, 'costo': 0.0},
+                {'origen': f'Parada({nodo_a[:3]})', 'destino': f'Parada({nodo_b[:3]})', 'modo': 'Micro', 'distancia': dist_micro, 'tiempo': tiempo_micro, 'geometria': geom_micro, 'costo': precio_pasaje},
+                {'origen': f'Parada({nodo_b[:3]})', 'destino': nodo_b, 'modo': 'Pie', 'distancia': dist_w2, 'tiempo': tiempo_w2, 'geometria': geom_caminata_2, 'costo': 0.0}
+            ])
+            
+    return segmentos, precio_pasaje, tiempo_total_tramo, distancia_total_tramo, impresion_modo
+```
 
 ### 3.2. Implementación de Poda Algorítmica y Análisis de Complejidad Matemática
 El problema principal que hemos solucionado es una variación estricta del problema de encontrar la ruta más corta para un repartidor que debe visitar muchas ciudades sin repetir trayectos. Intentar resolverlo de manera bruta significa calcular las variaciones exponenciales factoriales de todos los lugares. 
