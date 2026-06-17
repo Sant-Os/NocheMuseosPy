@@ -49,6 +49,38 @@ MUSEOS = {
 }
 ```
 
+### Scripts de Automatización: Descargas y Precálculo del Sistema
+Al hacer un simulador masivo, no podíamos exigirle al usuario que consiga los mapas a mano. Por eso programamos dos archivos extra que automatizan el trabajo previo al inicio del programa:
+
+**1. Descargador de Mapas (`setup_trufis.py`):** 
+Este archivo utiliza la biblioteca nativa `urllib.request`. Su función es ir directamente a un enlace de GitHub de datos libres de Cochabamba, y descargar un mapa de 2.2 Megabytes con todas las líneas de transporte, guardándolo automáticamente en la carpeta del usuario.
+```python
+# Archivo setup_trufis.py
+def descargar_rutas():
+    archivo = "rutas_trufis.geojson"
+    if not os.path.exists(archivo):
+        url = "https://gist.githubusercontent.com/mauforonda/b094e77a0af814dba978f6ae564faa78/raw"
+        urllib.request.urlretrieve(url, archivo)
+```
+
+**2. Precálculo de Rutas (`precalcular_rutas.py`):**
+Para que la computadora no tarde mucho la primera vez que el usuario presione "Calcular", programamos este archivo de calentamiento. Lo que hace es cruzar los 23 museos entre sí y pedirle a internet TODAS las rutas por adelantado, obligando al sistema a generar la memoria guardada (Caché).
+```python
+# Extracto de precalcular_rutas.py
+def generar_caches():
+    nombres = list(MUSEOS.keys())
+    total_museos = len(nombres)
+    for i in range(total_museos):
+        for j in range(total_museos):
+            if i == j: continue
+            origen = MUSEOS[nombres[i]]
+            destino = MUSEOS[nombres[j]]
+            
+            # Forzamos la descarga y el guardado en Caché para Peatón y Auto
+            obtener_ruta_vehiculo(origen, destino, perfil="peaton")
+            obtener_ruta_vehiculo(origen, destino, perfil="driving")
+```
+
 ---
 
 ## CAPÍTULO II: ARQUITECTURA DEL SISTEMA E INTERFAZ GRÁFICA
