@@ -32,6 +32,22 @@ Mediante el gestor de paquetes `pip`, el software instala los módulos pesados e
 - `math` y `itertools`: Proveen funciones de cálculo trigonométrico avanzado (seno, coseno, radianes) y creación de permutaciones matemáticas para la Inteligencia Artificial.
 - `json`, `os` y `time`: Administran el acceso de entrada/salida (I/O) al disco duro para leer mapas y bases de datos locales, y manejan los ciclos de reloj del procesador para la animación física de los marcadores en el mapa interactivo.
 
+```python
+# Bibliotecas nativas y externas importadas en el núcleo del proyecto
+import math
+import os
+import json
+import time
+import itertools
+import requests
+import polyline
+import folium
+from geopy.geocoders import Nominatim
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QPushButton, QListWidget, QTextEdit, QMessageBox, QGroupBox, QLineEdit, QListWidgetItem, QComboBox, QApplication, QCheckBox
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
+from PyQt5.QtCore import QUrl, pyqtSignal, Qt, QThread, QObject
+```
+
 ### 3. Instalación, Ejecución e Implementación de OpenStreetMap
 Para calcular las trayectorias de movimiento real de las entidades (ya sean peatones o vehículos), no es factible utilizar distancias en línea recta de forma exclusiva, debido a la infraestructura urbana y restricciones viales (sentidos de vía, bloqueos, parques).
 Por lo tanto, instalamos e implementamos una conexión en red con el servidor de la "Máquina de Enrutamiento de Código Abierto" respaldada por la gigantesca base de datos mundial de **OpenStreetMap** (OSRM). 
@@ -40,26 +56,74 @@ Por lo tanto, instalamos e implementamos una conexión en red con el servidor de
 El software emite una petición (Request) al puerto API de OpenStreetMap entregando el perfil de transporte (peatón o auto) junto a la latitud y longitud geométrica exacta del origen y el destino. El servidor remoto analiza el grafo de la ciudad de Cochabamba y responde entregando una "Polilínea", la cual es un arreglo masivo de puntos GPS que dibuja una línea a través del asfalto de las calles evadiendo las edificaciones.
 
 ```python
-# Extracto del código base de conectividad OSRM (configuracion.py)
-import requests
-import polyline
-
-# Se arma la petición HTTP para el servidor de OpenStreetMap
-url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
-
-try:
-    # Solicitamos la geometría real de la calle, con un tiempo de espera límite (timeout) de 5 segundos
-    respuesta = requests.get(url, headers={"User-Agent": "NocheMuseosSimulador/1.0"}, timeout=5)
-    datos = respuesta.json()
+# Módulo de conectividad completa a OpenStreetMap (configuracion.py)
+def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
+    llave = f"{perfil}|{origen[0]},{origen[1]}|{destino[0]},{destino[1]}"
+    memoria_activa = memoria_peaton if perfil == 'peaton' else memoria_taxi
     
-    if datos.get('code') == 'Ok':
-        # Desempaquetamos la distancia métrica otorgada por el servidor y la pasamos a Kilómetros
-        distancia_kilos = datos['routes'][0]['distance'] / 1000.0
+    if llave in memoria_activa:
+        datos = memoria_activa[llave]
+        return datos[0], datos[1], datos[2]
         
-        # Descomprimimos la Polilínea cifrada en un array explícito de Coordenadas de trazado de asfalto
-        puntos_ruta = polyline.decode(datos['routes'][0]['geometry'])
-except Exception as e:
-    pass
+    longitud_1, latitud_1 = origen[1], origen[0]
+    longitud_2, latitud_2 = destino[1], destino[0]
+    
+    if perfil == 'peaton':
+        url_peaton = f"https://routing.openstreetmap.de/routed-foot/route/v1/driving/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
+        try:
+            import time
+            time.sleep(0.3)
+            headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
+            respuesta = requests.get(url_peaton, headers=headers, timeout=5)
+            datos = respuesta.json()
+            if datos.get('code') == 'Ok':
+                ruta_obtenida = datos['routes'][0]
+                distancia_kilos = ruta_obtenida['distance'] / 1000.0
+                tiempo_minutos = (distancia_kilos / 5.0) * 60.0
+                puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
+                memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
+                guardar_memoria(perfil)
+                return distancia_kilos, tiempo_minutos, puntos_ruta
+        except Exception:
+            pass
+            
+        puntos_ruta = [
+            [origen[0], origen[1]],
+            [origen[0], destino[1]],
+            [destino[0], destino[1]]
+        ]
+        from geopy.distance import geodesic
+        dist_1 = geodesic(origen, (origen[0], destino[1])).km
+        dist_2 = geodesic((origen[0], destino[1]), destino).km
+        distancia_kilos = dist_1 + dist_2
+        tiempo_minutos = (distancia_kilos / 5.0) * 60.0
+        
+        memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
+        guardar_memoria(perfil)
+        return distancia_kilos, tiempo_minutos, puntos_ruta
+        
+    url = f"https://router.project-osrm.org/route/v1/{perfil}/{longitud_1},{latitud_1};{longitud_2},{latitud_2}?overview=full&geometries=polyline"
+    
+    try:
+        import time
+        time.sleep(0.3)
+        headers = {"User-Agent": "NocheMuseosSimulador/1.0"}
+        respuesta = requests.get(url, headers=headers, timeout=5)
+        datos = respuesta.json()
+        if datos.get('code') == 'Ok':
+            ruta_obtenida = datos['routes'][0]
+            distancia_kilos = ruta_obtenida['distance'] / 1000.0
+            tiempo_minutos = ruta_obtenida['duration'] / 60.0
+            puntos_ruta = polyline.decode(ruta_obtenida['geometry'])
+            memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
+            guardar_memoria(perfil)
+            return distancia_kilos, tiempo_minutos, puntos_ruta
+    except Exception:
+        pass
+        
+    memoria_activa[llave] = [None, None, None]
+    guardar_memoria(perfil)
+    return None, None, None
 ```
 
 ### 4. Cómo se consigue las métricas de medida y distancia. Y cómo se calcula
@@ -67,13 +131,9 @@ Cuando las distancias requeridas no provienen del ruteador de OpenStreetMap (por
 Para solucionar esto, implementamos matemáticamente la **Fórmula del Haversine**, que calcula distancias "geodésicas" respetando la curvatura de la Tierra, fijando el radio orbital del planeta en 6371 kilómetros constantes.
 
 ```python
-import math
-
+# Fórmula trigonométrica implementada en configuracion.py
 def calcular_distancia_directa(origen, destino):
-    """Calcula la distancia geodésica exacta entre dos puntos considerando la curva terrestre."""
-    radio_tierra = 6371.0  # El radio estándar volumétrico de la Tierra en Kilómetros
-
-    # Convertir grados de latitud/longitud decimal a Radianes trigonométricos
+    radio_tierra = 6371.0
     latitud_1 = math.radians(origen[0])
     longitud_1 = math.radians(origen[1])
     latitud_2 = math.radians(destino[0])
@@ -82,11 +142,8 @@ def calcular_distancia_directa(origen, destino):
     delta_latitud = latitud_2 - latitud_1
     delta_longitud = longitud_2 - longitud_1
     
-    # Ecuación central de la Trigonometría Esférica de Haversine
     a = math.sin(delta_latitud / 2)**2 + math.cos(latitud_1) * math.cos(latitud_2) * math.sin(delta_longitud / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    # Retorna la magnitud de distancia multiplicando el ángulo por el radio planetario
     return radio_tierra * c
 ```
 
@@ -100,24 +157,31 @@ La arquitectura se manifiesta principalmente en dos archivos que ensamblan todo 
 
 ```python
 # Archivo de ignición main.py
-import sys
-import os
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
-from ui_ventana import VentanaPrincipal
-
 if __name__ == "__main__":
-    # Desactivamos restricciones en tarjetas gráficas para maximizar compatibilidad en PCs genéricas
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --no-sandbox"
     os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
     
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     aplicacion = QApplication(sys.argv)
     
-    # Inicialización del Componente Visual y Arranque del Bucle de Escucha Permanente (Main Loop)
     ventana_principal = VentanaPrincipal()
     ventana_principal.show()
     sys.exit(aplicacion.exec_())
+
+# Constructor visual extraído de ui_ventana.py
+class VentanaPrincipal(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Noche de Museos")
+        self.resize(1300, 850)
+        self.tiempo_disponible = 0
+        self.presupuesto_disponible = 0
+        self.coordenada_origen = None
+        self.geolocalizador = Nominatim(user_agent="noche_museos_sim")
+        self.construir_interfaz()
+        self.dibujar_mapa()
+        self.transporte = AgenteTransporte(self.consola_registros, self.visor_web, self.restar_plata, self.restar_minutos)
+        self.guia = None 
 ```
 
 ### 6. Arquitectura Multiagente y Taxonomía
@@ -137,16 +201,26 @@ class AgenteGuia:
 
     def aterrizaje(self, nombre_edificio, funcion_continuar):
         if nombre_edificio == 'Origen':
-            # ... (Lógica de fin de tour en la UI) ...
+            mensaje = QMessageBox(self.interfaz)
+            mensaje.setWindowTitle("Fin")
+            mensaje.setText("¡Llegaste a casa!")
+            mensaje.setIcon(QMessageBox.Information)
+            mensaje.addButton("Aceptar", QMessageBox.AcceptRole)
+            mensaje.exec_()
             self.interfaz.consola_registros.append("[Guía] Fin del tour.")
             self.interfaz.boton_calcular.setEnabled(True)
             funcion_continuar()
             return
 
         precio_boleto = ENTRADAS.get(nombre_edificio, 0)
+        mensaje = QMessageBox(self.interfaz)
+        mensaje.setWindowTitle("Museo")
+        mensaje.setText(f"Visitar {nombre_edificio}?")
+        mensaje.setIcon(QMessageBox.Question)
+        mensaje.addButton("Entrar", QMessageBox.AcceptRole)
+        mensaje.exec_()
         if precio_boleto > 0:
             self.restar_plata(precio_boleto, f"entrada a {nombre_edificio}")
-            
         self.interfaz.consola_registros.append(f"[Guía] Explorando {nombre_edificio}...")
         multiplicador_aceleracion = int(self.interfaz.combo_acelerador.currentText().replace("x", ""))
         self.animacion = ControladorTurista(self.minutos_visita, multiplicador_aceleracion)
@@ -187,21 +261,22 @@ class AnimadorMovimiento(QThread):
             tipo_movimiento = segmento['modo']
             destino_nombre = segmento['destino']
             
-            metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
+            if tipo_movimiento == 'Micro':
+                metros_por_segundo = (20.0 * 1000) / 3600.0
+            else:
+                metros_por_segundo = self.velocidad_metros_auto if tipo_movimiento == 'Auto' else self.velocidad_metros_pie
                 
             for indice in range(len(puntos_gps) - 1):
                 if not self.activo: break
                 punto_a, punto_b = puntos_gps[indice], puntos_gps[indice+1]
                 metros_distancia = calcular_distancia_directa(punto_a, punto_b) * 1000.0
                 if metros_distancia == 0: continue
-                
                 segundos_reales = metros_distancia / metros_por_segundo
                 segundos_animacion = segundos_reales / self.multiplicador
                 cantidad_frames = max(1, int(segundos_animacion * self.cuadros_por_segundo))
                 salto_latitud = (punto_b[0] - punto_a[0]) / cantidad_frames
                 salto_longitud = (punto_b[1] - punto_a[1]) / cantidad_frames
                 minutos_reloj_simulado = (segundos_reales / 60.0) / cantidad_frames
-                
                 for frame in range(cantidad_frames):
                     if not self.activo: break
                     latitud_dibujada = punto_a[0] + salto_latitud * frame
@@ -209,7 +284,6 @@ class AnimadorMovimiento(QThread):
                     self.senal_coordenada.emit(latitud_dibujada, longitud_dibujada, tipo_movimiento)
                     self.senal_reloj.emit(minutos_reloj_simulado)
                     time.sleep(1.0 / self.cuadros_por_segundo)
-                    
             if self.activo:
                 self.senal_coordenada.emit(puntos_gps[-1][0], puntos_gps[-1][1], tipo_movimiento)
                 self.senal_llegada.emit(destino_nombre)
@@ -237,6 +311,7 @@ class AgenteTransporte:
         self.ruta_actual = datos_ruta
         self.indice_tramo = 0
         self.evento_llegada = funcion_llegada
+        self.visor_mapa.page().runJavaScript("if (window.removeMovingMarker) removeMovingMarker();")
         self.siguiente_movimiento(velocidad_coche, velocidad_caminando, acelerador)
         
     def siguiente_movimiento(self, velocidad_coche=None, velocidad_caminando=None, acelerador=None):
@@ -247,17 +322,19 @@ class AgenteTransporte:
             if costo_monetario > 0:
                 self.restar_plata(costo_monetario, f"boleto de {segmento['modo']}")
                 
+            color_pintura = "red"
+            if segmento['modo'] == 'Micro': color_pintura = "purple"
+            es_punteada = "true" if segmento['modo'] == 'Pie' else "false"
+            self.visor_mapa.page().runJavaScript(f"if(window.startNewTraveledLine) startNewTraveledLine('{color_pintura}', {es_punteada});")
+            
             self.animacion = AnimadorMovimiento([segmento], velocidad_coche, velocidad_caminando, acelerador)
             self.animacion.senal_coordenada.connect(self.refrescar_pantalla)
             self.animacion.senal_reloj.connect(self.restar_reloj)
             self.animacion.senal_llegada.connect(self.aterrizaje)
             self.animacion.start()
-            
             self.velocidad_coche = velocidad_coche
             self.velocidad_caminando = velocidad_caminando
             self.acelerador = acelerador
-        else:
-            self.consola.append("[Vehículo] Destino final alcanzado.")
 
     def refrescar_pantalla(self, latitud, longitud, transporte):
         color_icono = 'red' if transporte == 'Auto' else 'orange' if transporte == 'Pie' else 'purple'
@@ -294,8 +371,7 @@ class AgenteBuscador(QThread):
 
     def run(self):
         try:
-            # (El código gigante de "explorar_opciones" del motor de búsqueda DFS 
-            # se detalla por separado más adelante en el Punto 13 y Punto 15).
+            # (El bloque DFS gigante de explorar_opciones está documentado por completo en el Punto 13 y Punto 15)
             if self.permitir_pie:
                 explorar_opciones(['Origen'], self.lista_museos, 0.0, 0.0, [], [], 'Pie')
             if self.permitir_taxi:
@@ -322,21 +398,40 @@ Desarrollamos un subsistema `setup_trufis.py` encargado de descargar un archivo 
 Para implementar las "paradas", el sistema ejecuta un proceso de cruce geospacial de proximidad ("Radar"). El algoritmo carga en memoria todos los puntos geométricos del recorrido de las líneas de buses existentes, y realiza un chequeo contra cada uno de los 23 recintos de museos. Si un vértice callejero del microbús colisiona con el área de cobertura del museo (fijada estrictamente en un radio menor a 400 metros de distancia), ese vértice del asfalto se categoriza internamente en la estructura de datos como una "Parada Matemática Válida" desde la cual un Peatón puede hacer interconexión intermodal hacia el museo.
 
 ```python
-# Lógica de escáner geoespacial para la detección de intersecciones de Parada de Micro (configuracion.py)
-paradas_cercanas = {nodo: set() for nodo in nodos_ciudad}
-
-# Bucle O(N*M) que cruza cada museo contra todos los puntos cartográficos de las líneas
-for nombre_nodo, coordenada_nodo in nodos_ciudad.items():
-    for identificador_linea, ruta_linea in diccionario_lineas.items():
-        for punto_ruta in ruta_linea:
-            
-            # Cálculo directo de la distancia del vértice al edificio del museo
-            distancia_a_calle = calcular_distancia_directa(coordenada_nodo, punto_ruta)
-            
-            # Tolerancia de proximidad: Si la línea pasa a menos de 400 metros (0.4 km) es una parada factible
-            if distancia_a_calle < 0.4:
-                paradas_cercanas[nombre_nodo].add(identificador_linea)
-                break
+# Módulo de Radar de intersección que cruza las rutas con los museos (agentes_ia.py)
+def proyectar_punto(punto):
+    mejor_idx, min_d = -1, float('inf')
+    for k, p_ruta in enumerate(ruta_fisica):
+        d = calcular_distancia_directa(punto, p_ruta)
+        if d < min_d: min_d, mejor_idx = d, k
+    return ruta_fisica[mejor_idx], mejor_idx, min_d
+    
+def ubicar_paradas(punto_inicio, punto_fin, coordenadas_ruta):
+    candidatos_inicio = [(idx, calcular_distancia_directa(punto_inicio, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_inicio, coord) < 0.6]
+    candidatos_fin = [(idx, calcular_distancia_directa(punto_fin, coord)) for idx, coord in enumerate(coordenadas_ruta) if calcular_distancia_directa(punto_fin, coord) < 0.6]
+    
+    if not candidatos_inicio or not candidatos_fin:
+        _, indice_a, dist_a = proyectar_punto(punto_inicio)
+        _, indice_b, dist_b = proyectar_punto(punto_fin)
+        return indice_a, indice_b, dist_a, dist_b
+        
+    mejor_a, mejor_b = -1, -1
+    costo_minimo = float('inf')
+    
+    for i, d_pie_inicio in candidatos_inicio:
+        for j, d_pie_fin in candidatos_fin:
+            distancia_nodos = (j - i) if i <= j else (len(coordenadas_ruta) - i + j)
+            costo_calculado = d_pie_inicio + d_pie_fin + (distancia_nodos * 0.002)
+            if costo_calculado < costo_minimo:
+                costo_minimo = costo_calculado
+                mejor_a, mejor_b = i, j
+                
+    if mejor_a == -1:
+        _, indice_a, dist_a = proyectar_punto(punto_inicio)
+        _, indice_b, dist_b = proyectar_punto(punto_fin)
+        return indice_a, indice_b, dist_a, dist_b
+        
+    return mejor_a, mejor_b, calcular_distancia_directa(punto_inicio, coordenadas_ruta[mejor_a]), calcular_distancia_directa(punto_fin, coordenadas_ruta[mejor_b])
 ```
 
 ### 8. Cómo desarrollamos e implementamos el Caché para las rutas del peatón y en taxi
@@ -346,23 +441,37 @@ Desarrollamos una política de persistencia de "Caché Dual" de Espacio/Tiempo.
 El software aloja en su directorio raíz dos repositorios locales JSON (`cache_peatonal.json` y `cache_taxi.json`). Cuando el Agente Buscador consulta la latitud A a la longitud B, el sistema actúa como un proxy. Primero realiza un barrido de búsqueda "Llave-Valor" en su Caché en Disco. Si halla una coincidencia, obtiene la distancia, la ruta y el tiempo en 0.001 segundos y aborta la petición a internet. De lo contrario, solicita el trazado al servidor OSRM mundial y, acto seguido, guarda obligatoriamente dicha trayectoria en su Caché interno para solventar peticiones colindantes futuras.
 
 ```python
-# Sistema de retención e inyección proxy de Caché Dual (configuracion.py)
-def obtener_ruta_vehiculo(origen, destino, perfil="driving"):
-    # Firma criptográfica visual de la ruta (Ejemplo: "driving|-17.3,-66.1|-17.4,-66.2")
-    llave = f"{perfil}|{origen[0]},{origen[1]}|{destino[0]},{destino[1]}"
-    memoria_activa = memoria_peaton if perfil == 'peaton' else memoria_taxi
-    
-    # ÉXITO PROXY: Extracción ultrarrápida si la ruta ya figura en el Disco de Memoria
-    if llave in memoria_activa:
-        datos = memoria_activa[llave]
-        return datos[0], datos[1], datos[2]
-        
-    # FALLO: Llamada remota mediante red al servidor OpenStreetMap (OSRM)
-    # [...] Invocación de request.get() vista anteriormente
-    
-    # Retención obligatoria de los datos traídos en la memoria y sincronización al Disco Duro
-    memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
-    guardar_memoria(perfil)
+# Lógica de Extracción y Almacenamiento en Archivos Locales Json (configuracion.py)
+ARCHIVO_PEATONAL = "cache_peatonal.json"
+ARCHIVO_TAXI = "cache_taxi.json"
+
+memoria_peaton = {}
+memoria_taxi = {}
+
+if os.path.exists(ARCHIVO_PEATONAL):
+    try:
+        with open(ARCHIVO_PEATONAL, "r", encoding="utf-8") as archivo:
+            memoria_peaton = json.load(archivo)
+    except Exception:
+        pass
+
+if os.path.exists(ARCHIVO_TAXI):
+    try:
+        with open(ARCHIVO_TAXI, "r", encoding="utf-8") as archivo:
+            memoria_taxi = json.load(archivo)
+    except Exception:
+        pass
+
+def guardar_memoria(perfil):
+    try:
+        if perfil == 'peaton':
+            with open(ARCHIVO_PEATONAL, "w", encoding="utf-8") as archivo:
+                json.dump(memoria_peaton, archivo, indent=4)
+        else:
+            with open(ARCHIVO_TAXI, "w", encoding="utf-8") as archivo:
+                json.dump(memoria_taxi, archivo, indent=4)
+    except Exception:
+        pass
 ```
 
 ### 9. Ubicación de todos los museos, cómo los ingresamos en el proyecto
@@ -372,16 +481,31 @@ Realizamos labores previas de minería de coordenadas para los 23 museos involuc
 Para materializar esta matriz dentro de nuestro ecosistema, la transcribimos creando una de las estructuras más veloces en lenguaje de programación Python conocida como un "Diccionario Constante de Datos", indexado y fijado en `configuracion.py`. Dicho diccionario convierte una solicitud textual basada en llaves en un tuple (par coordenado) en tiempo de complejidad algorítmica constante O(1).
 
 ```python
-# Declaración de la Matriz Central Constante (configuracion.py)
+# Matriz absoluta de posicionamiento insertada en configuracion.py
 MUSEOS = {
     '[A] Convento Museo Santa Teresa': (-17.389753, -66.157962),
     '[B] Museo Casa Martín Cárdenas': (-17.392648, -66.160518),
     '[C] Casona de Santiváñez': (-17.394425, -66.159162),
     '[D] Museo Arqueológico UMSS': (-17.395278, -66.157394),
     '[E] Iglesia de la Compañía de Jesús': (-17.393023, -66.157814),
-    '[F] Museo de Historia de la Medicina': (-17.382025, -66.151741),
-    '[G] Casona Mayorazgo': (-17.373678, -66.165403),
-    # ... (Matriz extendida y completada con la totalidad de los 23 museos de Cochabamba)
+    '[F] Casa Departamental de Culturas': (-17.393081, -66.157084),
+    '[G] Salón de Exposiciones Gíldaro Antezana': (-17.393008, -66.156494),
+    '[H] Casona de la UNITEPC': (-17.392542, -66.156150),
+    '[I] Salón de Exposiciones ABAP-CBBA': (-17.392294, -66.156730),
+    '[J] Salón de Exposiciones Mario Unzueta': (-17.391564, -66.155680),
+    '[K] Museo Francisco de Viedma': (-17.387265, -66.150514),
+    '[L] Museo Alcides d\'Orbigny': (-17.373723, -66.153692),
+    '[M] Palacio Portales (Fundación Simón I. Patiño)': (-17.374561, -66.153052),
+    '[N] Casona de Mayorazgo': (-17.365018, -66.174732),
+    '[O] Centro Cultural Juan Wallparrimachi': (-17.388766, -66.187239),
+    '[P] Proyecto mARTadero': (-17.400032, -66.165723),
+    '[Q] Casa del Arquitecto': (-17.396950, -66.159329),
+    '[R] Casona del Banco Solidario': (-17.397657, -66.155581),
+    '[S] Museo Esteban Arze': (-17.396419, -66.172168),
+    '[T] Museo de la Reserva Moral y Estratégica': (-17.398620, -66.156797),
+    '[U] Museo Mariscal Andrés de Santa Cruz': (-17.397133, -66.160901),
+    '[V] Museo de Arte Chinchiri': (-17.385307, -66.262618),
+    '[W] Museo de la Escuela de Armas Mcal. José Ballivián': (-17.378998, -66.143439)
 }
 ```
 
@@ -390,19 +514,21 @@ Cuando un algoritmo matemático exige trasladar un elemento del recinto A al rec
 Por tanto, desarrollamos el cálculo en forma de un control "Try / Except". Si la conexión remota OSRM es un éxito, el sistema decodifica las polilíneas de las calles verdaderas. Si se produce un error y el servidor cae, se detona un **"Plan Logístico de Emergencia"**. El plan de emergencia acude a la fórmula de Haversine pura, tendiendo un vector directo imaginario desde la puerta A hasta la B y aplicándole una penalización sintética de aumento de distancia del 30% (`* 1.3`) como compensación al hecho de que el camino real habría contenido curvas u obstáculos peatonales.
 
 ```python
-# Plan Logístico de Compensación de Fallas y Emergencia Cartográfica (configuracion.py)
-except Exception as e:
-    # Si las peticiones web fracasan irremediablemente, creamos vectores matemáticos directos
-    # Le añadimos al resultado métrico un factor limitante y punitivo extra del 30% por curvas
-    distancia_kilos = calcular_distancia_directa(origen, destino) * 1.3
-    
-    # Reconstrucción forzosa de variables físicas a partir de velocidad base ficticia de 20km/h
-    tiempo_minutos = (distancia_kilos / 20.0) * 60
-    
-    # Unión de vértices A - B para que el renderizador no tenga nulos
-    puntos_ruta = [origen, destino]
-    
-    return distancia_kilos, tiempo_minutos, puntos_ruta
+# Lógica extraída de configuracion.py (Segmento peatonal defectuoso / Sin red)
+        puntos_ruta = [
+            [origen[0], origen[1]],
+            [origen[0], destino[1]],
+            [destino[0], destino[1]]
+        ]
+        from geopy.distance import geodesic
+        dist_1 = geodesic(origen, (origen[0], destino[1])).km
+        dist_2 = geodesic((origen[0], destino[1]), destino).km
+        distancia_kilos = dist_1 + dist_2
+        tiempo_minutos = (distancia_kilos / 5.0) * 60.0
+        
+        memoria_activa[llave] = [distancia_kilos, tiempo_minutos, puntos_ruta]
+        guardar_memoria(perfil)
+        return distancia_kilos, tiempo_minutos, puntos_ruta
 ```
 
 ### 11. Los modos de transporte, cómo los implementamos e instalamos
@@ -414,43 +540,70 @@ Dentro de las jerarquías de movimiento, implementamos 3 modalidades intermodale
 Dichos mecanismos están amarrados directamente en los controles de la Interfaz Visual y controlan booleanos algorítmicos. La implementación visual recae en botones de activación (Checkboxes) configurados por el usuario antes del motor, determinando y filtrando qué rutinas matemáticas debe ignorar la IA al momento de buscar sus grafos.
 
 ```python
-# Controles de activación de sub-árboles de modos de transporte en Interfaz (ui_ventana.py)
-self.check_pie = QCheckBox("Pie")
-self.check_pie.setChecked(True)
+# Implementación total de las casillas en la interfaz de ui_ventana.py
+        grupo_transporte = QGroupBox("3. Modos de Transporte Permitidos")
+        formulario_transporte = QHBoxLayout()
+        
+        self.check_pie = QCheckBox("Pie")
+        self.check_pie.setChecked(True)
+        self.check_taxi = QCheckBox("Taxi")
+        self.check_taxi.setChecked(True)
+        self.check_micro = QCheckBox("Micro")
+        self.check_micro.setChecked(True)
+        
+        formulario_transporte.addWidget(self.check_pie)
+        formulario_transporte.addWidget(self.check_taxi)
+        formulario_transporte.addWidget(self.check_micro)
+        grupo_transporte.setLayout(formulario_transporte)
+        diseno_izquierdo.addWidget(grupo_transporte)
 
-self.check_taxi = QCheckBox("Taxi")
-self.check_taxi.setChecked(True)
-
-self.check_micro = QCheckBox("Micro")
-self.check_micro.setChecked(True)
-
-# Captura de inyecciones binarias a los Algoritmos del Buscador Supremo
-permitir_pie = self.check_pie.isChecked()
-permitir_taxi = self.check_taxi.isChecked()
-permitir_micro = self.check_micro.isChecked()
+# Posteriormente la IA absorbe su valor para prohibir la recursión en modos desmarcados
+        permitir_pie = self.check_pie.isChecked()
+        permitir_taxi = self.check_taxi.isChecked()
+        permitir_micro = self.check_micro.isChecked()
 ```
 
-### 12. Cómo creamos el caché para optimizar las operaciones de macrooperadores
+### 12. Cómo creamos el Caché para optimizar las operaciones de macrooperadores
 El funcionamiento matemático puro del intermodalismo peatón-autobús-peatón genera que se tengan que fabricar tres recorridos de manera espontánea (la caminata, el viaje y el retorno a la puerta). Generar estas tres acciones en línea requeriría triplicar el retraso computacional en cada exploración combinatoria de los millones de posibles cruces.
 Para arreglar este cuello de botella algorítmico, implementamos el archivo `precalcular_rutas.py`. Este módulo automatizado tiene la tarea de cruzar obligatoriamente los vértices de todos los 23 museos entre sí antes siquiera de que el software sea utilizado comercialmente. Al forzar a que el servidor analice todos los escenarios del grafo, este script logra el rellenado artificial exhaustivo del "Caché Local Peatonal".
 Luego, el Macrooperador que ensambla el recorrido del bus, simplemente extrae su componente peatonal del disco duro de la computadora en velocidad ultrarrápida, eliminando por completo cualquier consulta redondante online de peatonización durante el análisis profundo.
 
 ```python
-# Módulo de Automatización de Forzado Estructural del Caché Inicial (precalcular_rutas.py)
+# Archivo ejecutable completo de precalcular_rutas.py
+import time
+import json
+import configuracion
+from configuracion import MUSEOS, obtener_ruta_vehiculo
+
 def generar_caches():
     nombres = list(MUSEOS.keys())
     total_museos = len(nombres)
+    total_pares = total_museos * (total_museos - 1)
     
-    # Complejidad cuadrática cruzando todos contra todos (O(N^2))
+    print(f"Iniciando pre-cálculo de {total_pares} pares de rutas...")
+    pares_procesados = 0
     for i in range(total_museos):
         for j in range(total_museos):
-            if i == j: continue
+            if i == j:
+                continue
+                
             origen = MUSEOS[nombres[i]]
             destino = MUSEOS[nombres[j]]
             
-            # Detonamos y forzamos activamente que OSRM empaquete todas las calles y retenga la respuesta en Disco
+            print(f"[{pares_procesados+1}/{total_pares}] Calculando Peatón: {nombres[i][:15]}... -> {nombres[j][:15]}...")
             obtener_ruta_vehiculo(origen, destino, perfil="peaton")
+            
+            print(f"[{pares_procesados+1}/{total_pares}] Calculando Taxi: {nombres[i][:15]}... -> {nombres[j][:15]}...")
             obtener_ruta_vehiculo(origen, destino, perfil="driving")
+            
+            pares_procesados += 1
+            
+    print("¡Pre-cálculo finalizado exitosamente!")
+    print(f"Rutas peatonales guardadas en: {configuracion.ARCHIVO_PEATONAL}")
+    print(f"Rutas vehiculares guardadas en: {configuracion.ARCHIVO_TAXI}")
+
+if __name__ == "__main__":
+    generar_caches()
 ```
 
 ### 13. Instalación e Implementación de Motores de Búsqueda
@@ -458,29 +611,88 @@ La joya algorítmica del proyecto es su IA de selección paramétrica que garant
 Su diseño arquitectónico se sustenta en expandir progresivamente el recorrido agregando museo tras museo y calculando su acumulador total de costos de minutos y bolivianos. Para garantizar el descenso infinito en todas las opciones posibles de recorridos (y deshacer operaciones para explorar otras ramas si fuera necesario), este sistema fue implantado empleando recursividad. 
 
 ```python
-# Módulo Recursivo del Buscador Analítico en Profundidad IA (agentes_ia.py)
-def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado):
-    # Condición recursiva de hoja terminal
-    if not museos_faltantes:
-        rutas_validas.append({
-            'ruta': camino_actual,
-            'cantidad_museos': len(camino_actual),
-            'dinero_gastado': gasto_acumulado,
-            'minutos_gastados': reloj_acumulado
-        })
-        return
+# Motor de Fuerza Bruta Optimizada DFS (agentes_ia.py)
+            def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado, trazos_ruta, lineas_registro, modo_fijo):
+                if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+                    m = len(museos_faltantes)
+                    ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+                    self.contador_exploracion += ramas_cortadas
+                    texto_camino = [abreviar(x) for x in camino_actual] + [abreviar(m) for m in museos_faltantes] + ['Origen']
+                    cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
+                    registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                    registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
+                    self.progreso_senal.emit("\n".join(registro_final))
+                    return
 
-    # Iteración de ensanchamiento horizontal probando el siguiente Museo factible
-    for i, museo_destino in enumerate(museos_faltantes):
-        nuevo_gasto, nuevo_reloj = computar_nodo(camino_actual, museo_destino)
-        
-        # Invocación recursiva: El Motor desciende a un nivel más profundo llamándose de nuevo a sí mismo
-        explorar_opciones(
-            camino_actual + [{'destino': museo_destino}],
-            museos_faltantes[:i] + museos_faltantes[i+1:], 
-            nuevo_gasto, 
-            nuevo_reloj
-        )
+                if len(camino_actual) > 1:
+                    origen_tramo = camino_actual[-1]
+                    destino_tramo = 'Origen'
+                    coord_origen_tramo, coord_destino_tramo = coordenadas[origen_tramo], coordenadas['Origen']
+                    distancia_recta = calcular_distancia_directa(coord_origen_tramo, coord_destino_tramo)
+                    
+                    opciones_transporte = []
+                    if modo_fijo == 'Pie': opciones_transporte.append('Pie')
+                    elif modo_fijo == 'Auto': opciones_transporte.append('Auto')
+                    elif modo_fijo == 'Micro':
+                        if origen_tramo in MATRIZ_TRANSPORTE and destino_tramo in MATRIZ_TRANSPORTE[origen_tramo] and MATRIZ_TRANSPORTE[origen_tramo][destino_tramo]['costo_pasaje'] < float('inf'):
+                            opciones_transporte.append('Micro')
+                        
+                    for tipo_transporte in opciones_transporte:
+                        self.contador_exploracion += 1
+                        nuevos_segmentos, costo_tramo, tiempo_tramo, distancia_km, texto_modo = calcular_segmento(origen_tramo, destino_tramo, coord_origen_tramo, coord_destino_tramo, tipo_transporte, distancia_recta)
+                        costo_total_evaluado = gasto_acumulado + costo_tramo
+                        tiempo_total_evaluado = reloj_acumulado + tiempo_tramo
+                        
+                        texto_camino = [abreviar(x) for x in camino_actual] + ['Origen']
+                        cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}] usando {texto_modo}"
+                        registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                        registro_final.append(f"|  -> {abreviar(destino_tramo):<15} | {distancia_km:>6.2f} km | {tiempo_tramo:>5.1f} min | {texto_modo} ({costo_tramo:.1f} Bs)")
+                        
+                        if costo_total_evaluado <= self.presupuesto_maximo and tiempo_total_evaluado <= self.tiempo_maximo:
+                            registro_final.append(f"└─ TOTALES: {costo_total_evaluado:.1f} Bs | {tiempo_total_evaluado:.1f} min | ✔ CORRECTA ({len(camino_actual)-1} Museos)")
+                            self.progreso_senal.emit("\n".join(registro_final))
+                            ruta_definitiva = camino_actual + ['Origen']
+                            trazos_definitivos = trazos_ruta + nuevos_segmentos
+                            lista_modos = [segmento['modo'] for segmento in trazos_definitivos]
+                            rutas_encontradas.append({
+                                'numero_operacion': self.contador_exploracion,
+                                'nombre_ruta': " -> ".join([abreviar(x) for x in camino_actual[1:]]),
+                                'cantidad_museos': len(camino_actual) - 1,
+                                'secuencia': ruta_definitiva, 'vehiculos_usados': lista_modos, 'dinero_gastado': costo_total_evaluado,
+                                'minutos_gastados': tiempo_total_evaluado, 'geometrias': trazos_definitivos, 'museos_objetivo': self.lista_museos
+                            })
+                        else:
+                            if not museos_faltantes:
+                                registro_final.append(f"└─ TOTALES: {costo_total_evaluado:.1f} Bs | {tiempo_total_evaluado:.1f} min | ✘ DESCARTADA")
+                                self.progreso_senal.emit("\n".join(registro_final))
+
+                if not museos_faltantes:
+                    return
+
+                for siguiente_museo in museos_faltantes:
+                    origen_tramo = camino_actual[-1]
+                    destino_tramo = siguiente_museo
+                    coord_origen_tramo, coord_destino_tramo = coordenadas[origen_tramo], coordenadas[destino_tramo]
+                    distancia_recta = calcular_distancia_directa(coord_origen_tramo, coord_destino_tramo)
+                    
+                    opciones_transporte = []
+                    if modo_fijo == 'Pie': opciones_transporte.append('Pie')
+                    elif modo_fijo == 'Auto': opciones_transporte.append('Auto')
+                    elif modo_fijo == 'Micro':
+                        if origen_tramo in MATRIZ_TRANSPORTE and destino_tramo in MATRIZ_TRANSPORTE[origen_tramo] and MATRIZ_TRANSPORTE[origen_tramo][destino_tramo]['costo_pasaje'] < float('inf'):
+                            opciones_transporte.append('Micro')
+
+                    for tipo_transporte in opciones_transporte:
+                        nuevos_segmentos, costo_tramo, tiempo_tramo, distancia_km, texto_modo = calcular_segmento(origen_tramo, destino_tramo, coord_origen_tramo, coord_destino_tramo, tipo_transporte, distancia_recta)
+
+                        costo_calculado = gasto_acumulado + ENTRADAS[destino_tramo] + costo_tramo
+                        tiempo_calculado = reloj_acumulado + self.duracion_visita + tiempo_tramo
+                        
+                        linea_texto = f"|  -> {abreviar(destino_tramo):<15} | {distancia_km:>6.2f} km | {tiempo_tramo:>5.1f} min | {texto_modo} ({costo_tramo:.1f} Bs)"
+                        trazos_combinados = trazos_ruta + nuevos_segmentos
+                        
+                        sobrantes = [m for m in museos_faltantes if m != siguiente_museo]
+                        explorar_opciones(camino_actual + [siguiente_museo], sobrantes, costo_calculado, tiempo_calculado, trazos_combinados, lineas_registro + [linea_texto], modo_fijo)
 ```
 
 ### 14. Instalación e Implementación de Macrooperadores
@@ -488,16 +700,43 @@ Al analizar la inserción de un transporte público (Micro o Trufi), se presenta
 Por ello, instalamos e implementamos la figura del **Macrooperador**, una herramienta heurística de programación. El Macrooperador ensambla bajo tierra esos 3 pasos fragmentados y, desde la perspectiva matemática del Motor Buscador, le inyecta directamente el cálculo total como una única macro-pieza atómica unificada inquebrantable, estabilizando el cálculo algorítmico y dándole agilidad al procesamiento.
 
 ```python
-# Sistema de Inserción Heurística Multimodal mediante Macrooperadores Consolidados (agentes_ia.py)
-elif tipo_viaje == 'Micro':
-    # La computadora deduce transparentemente los puntos peatonales necesarios a la parada de interés
-    
-    # Inyección Estructural: 3 eventos subyacentes se anexan y agrupan conformando un sólo Macro-Desplazamiento unificado
-    segmentos.extend([
-        {'origen': nodo_a, 'destino': f'Parada_Inicio', 'modo': 'Pie', 'geometria': caminata_salida, 'costo': 0.0},
-        {'origen': f'Parada_Inicio', 'destino': f'Parada_Fin', 'modo': 'Micro', 'geometria': micro, 'costo': tarifa_estandar},
-        {'origen': f'Parada_Fin', 'destino': nodo_b, 'modo': 'Pie', 'geometria': caminata_llegada, 'costo': 0.0}
-    ])
+# Bloque del Macrooperador en el módulo calcular_segmento (agentes_ia.py)
+                elif tipo_viaje == 'Micro':
+                    info_ruta = MATRIZ_TRANSPORTE[nodo_a][nodo_b]
+                    id_linea = info_ruta['lineas_disponibles'][0]
+                    ruta_fisica = LINEAS_TRUFIS.get(id_linea)
+                    
+                    if ruta_fisica:
+                        idx_origen, idx_destino, dist_caminata_1, dist_caminata_2 = ubicar_paradas(coord_a, coord_b, ruta_fisica)
+                        coord_parada_1, coord_parada_2 = ruta_fisica[idx_origen], ruta_fisica[idx_destino]
+                        
+                        _, _, geom_c1 = obtener_ruta_vehiculo(coord_a, coord_parada_1, perfil="peaton")
+                        geom_caminata_1 = geom_c1 if geom_c1 else [coord_a, coord_parada_1]
+                        dist_w1, tiempo_w1 = dist_caminata_1, dist_caminata_1 / self.velocidad_caminando
+                        
+                        if idx_origen <= idx_destino:
+                            geom_micro = ruta_fisica[idx_origen : idx_destino + 1]
+                        else:
+                            geom_micro = ruta_fisica[idx_origen : ] + ruta_fisica[0 : idx_destino + 1]
+                            
+                        dist_micro = sum(calcular_distancia_directa(geom_micro[k], geom_micro[k+1]) for k in range(len(geom_micro)-1)) if len(geom_micro) > 1 else 0
+                        tiempo_micro = (dist_micro * 1.3) / (20.0 / 60.0)
+                        
+                        _, _, geom_c2 = obtener_ruta_vehiculo(coord_parada_2, coord_b, perfil="peaton")
+                        geom_caminata_2 = geom_c2 if geom_c2 else [coord_parada_2, coord_b]
+                        dist_w2, tiempo_w2 = dist_caminata_2, dist_caminata_2 / self.velocidad_caminando
+                        
+                        precio_pasaje = info_ruta['costo_pasaje']
+                        tiempo_total_tramo = tiempo_w1 + tiempo_micro + tiempo_w2
+                        distancia_total_tramo = dist_w1 + dist_micro + dist_w2
+                        impresion_modo = f"Micro ({id_linea})"
+                        
+                        # El Macrooperador acopla todo como una acción indivisible de 3 capas
+                        segmentos.extend([
+                            {'origen': nodo_a, 'destino': f'Parada({abreviar(nodo_a)})', 'modo': 'Pie', 'distancia': dist_w1, 'tiempo': tiempo_w1, 'geometria': geom_caminata_1, 'costo': 0.0},
+                            {'origen': f'Parada({abreviar(nodo_a)})', 'destino': f'Parada({abreviar(nodo_b)})', 'modo': 'Micro', 'distancia': dist_micro, 'tiempo': tiempo_micro, 'geometria': geom_micro, 'costo': precio_pasaje},
+                            {'origen': f'Parada({abreviar(nodo_b)})', 'destino': nodo_b, 'modo': 'Pie', 'distancia': dist_w2, 'tiempo': tiempo_w2, 'geometria': geom_caminata_2, 'costo': 0.0}
+                        ])
 ```
 
 ### 15. Instalación e Implementación de Poda
@@ -506,18 +745,20 @@ Para salvar esto, implementamos rigurosas técnicas de poda combinatoria. A cada
 
 ```python
 # Sistema de Poda Cuantitativa de Ramas Limitadas por Costos (agentes_ia.py)
-def explorar_opciones(camino_actual, museos_faltantes, gasto_acumulado, reloj_acumulado):
-    
-    # Evaluación Axiomática Estricta: Si nos pasamos de cualquier parámetro Límite de Bolsa, cortamos la rama de raíz
-    if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
-        m = len(museos_faltantes)
-        
-        # Métrica opcional: Calculamos y contabilizamos exactamente cuántos cientos de miles de ramas basura nos ahorramos
-        ramas_asesinadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
-        self.contador_exploracion += ramas_asesinadas
-        
-        # Interrupción Absoluta de Procesamiento, abortando a la IA para forzar su exploración en una rama lateral distinta
-        return
+                if gasto_acumulado > self.presupuesto_maximo or reloj_acumulado > self.tiempo_maximo:
+                    m = len(museos_faltantes)
+                    # Se calcula con factorial la suma matemática de la infinidad de ramas abortadas
+                    ramas_cortadas = sum(math.factorial(m) // math.factorial(m - k) for k in range(1, m + 1)) + 1 if m > 0 else 1
+                    self.contador_exploracion += ramas_cortadas
+                    
+                    texto_camino = [abreviar(x) for x in camino_actual] + [abreviar(m) for m in museos_faltantes] + ['Origen']
+                    cabecera = f"\nOpcion [{self.contador_exploracion}/{total_combinaciones}]: [{' -> '.join(texto_camino)}]"
+                    registro_final = [cabecera, "-" * 65] + list(lineas_registro)
+                    
+                    # Interrupción del DFS e impresión del log de eliminación
+                    registro_final.append(f"└─ PODA: Costo={gasto_acumulado:.1f} Bs | Tiempo={reloj_acumulado:.1f} min | Omitidas: {ramas_cortadas}")
+                    self.progreso_senal.emit("\n".join(registro_final))
+                    return
 ```
 
 ### 16. Instalación e Implementación de Cálculo de Tiempo por Tramo
@@ -525,16 +766,21 @@ Tanto el Agente Físico Animador, como el propio Motor Buscador que mide las res
 Al multiplicar distancias puras por tasas relativas configuradas (la velocidad en coche fijada a 40km/h y la marcha a pie a 5km/h), aseguramos un sistema unificado y simétrico de medición de tiempos que es independiente de la topografía que decida la ruta.
 
 ```python
-# Reconfiguración Estricta Mecánica (Leyes Físicas del Tiempo y Velocidad Uniforme) (agentes_ia.py)
-
-# Discriminación referencial de velocidad de acuerdo a la naturaleza semántica de transporte del segmento actual
-velocidad_física_actual = self.velocidad_auto if modo == 'Auto' else self.velocidad_pie
-
-# Ley Mecánica Universal de Cuerpos Dinámicos: Tiempo (Horas) = Magnitud Distancia (Km) / Velocidad de Vector (Km/h)
-tiempo_horas_crudas = distancia_kilos / velocidad_física_actual
-
-# Ajuste temporal simple de escala temporal decimal horaria hacia escala de conteo sexagesimal minutera
-tiempo_minutos_totales = tiempo_horas_crudas * 60
+# Lógica Cinemática Universal de Cuerpos Dinámicos en calcular_segmento (agentes_ia.py)
+                if tipo_viaje == 'Pie':
+                    distancia_total_tramo = distancia_lineal * 1.1 
+                    # Tiempo = Distancia / Velocidad
+                    tiempo_total_tramo = distancia_total_tramo / self.velocidad_caminando
+                    
+                elif tipo_viaje == 'Auto':
+                    d_vehiculo, t_vehiculo, geom_vehiculo = obtener_ruta_vehiculo(coord_a, coord_b, perfil="driving")
+                    if geom_vehiculo is None:
+                        distancia_total_tramo = distancia_lineal * 1.3
+                        # Reajuste manual de Tiempo
+                        tiempo_total_tramo = distancia_total_tramo / self.velocidad_coche
+                    else:
+                        distancia_total_tramo = d_vehiculo
+                        tiempo_total_tramo = t_vehiculo
 ```
 
 ### 17. Instalación e Implementación de Filtrado y Despliegue de Resultados
@@ -542,16 +788,18 @@ Cuando finalizan el motor de recursión y la Poda de descarte, puede haber cient
 Para decidir el Plan Victorioso, instalamos un bloque de código discriminador de Filtrado de Resultados en forma de Agente de Utilidad (una criba). Este analizador lee todas las propuestas viables encontradas, identifica cuál ruta visitó de forma absoluta el récord mayor del torneo (por ejemplo: la que logró incluir 10 museos), y purga agresiva e indiscriminadamente a toda ruta conformista que haya logrado visitar 9, 8 o menos, presentando solo a la élite suprema en la Pantalla.
 
 ```python
-# Motor Criba Discriminadora de Utilidad Máxima Optimizada (agentes_ia.py)
-if rutas_validas:
-    # 1. Búsqueda de récord global sobre el array de atributos de viabilidad para establecer el "Techo de Campeón"
-    techo_max_museos = max(ruta['cantidad_museos'] for ruta in rutas_validas)
-    
-    # 2. Reestructuración de lista comprimida aplicando discriminación y eliminación del resto de entidades menores y conformistas
-    mejores_rutas = [ruta for ruta in rutas_validas if ruta['cantidad_museos'] == techo_max_museos]
-    
-    # 3. Empuje asíncrono y Despliegue directo al visor principal de las rutas ganadoras coronadas y probadas
-    self.finalizado_senal.emit(mejores_rutas)
+# Motor Criba Discriminadora de Utilidad (agentes_ia.py)
+            if rutas_encontradas:
+                # Localizamos a la ruta de Excelencia (Techo del Campeonato)
+                max_museos = max(r['cantidad_museos'] for r in rutas_encontradas)
+                
+                # Purgamos y borramos de la matriz final cualquier iteración que no haya empatado ese techo
+                rutas_validas = [r for r in rutas_encontradas if r['cantidad_museos'] == max_museos]
+                
+                # Emitimos las listas invictas a la Interfaz Visual (GUI)
+                self.finalizado_senal.emit(rutas_validas)
+            else:
+                self.finalizado_senal.emit([])
 ```
 
 ### 18. Manual Operativo Completo para el usuario del simulador
